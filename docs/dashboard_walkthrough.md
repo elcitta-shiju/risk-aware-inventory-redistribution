@@ -6,7 +6,7 @@ our team, so that every one of us can explain, demo and defend the project.
 **How to open the dashboard** (from PowerShell):
 
 ```powershell
-cd "C:\Users\ElcittaShiju\OneDrive\Desktop\Main project\prototype"
+cd prototype
 .\.venv\Scripts\Activate.ps1
 streamlit run dashboard/app.py
 ```

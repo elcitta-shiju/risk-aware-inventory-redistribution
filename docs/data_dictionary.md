@@ -1,7 +1,7 @@
 # Data dictionary
 
 Original archives (read-only, never modified) live in
-`C:\Users\ElcittaShiju\OneDrive\Desktop\Main project\project data\dataset` (configurable via `INVENTORY_DATA_DIR`).
+`../project data/dataset` (configurable via `INVENTORY_DATA_DIR`).
 **Note:** the folder is named `dataset` (singular), not `datasets` as in the original brief.
 `scripts/extract_data.py` copies their contents into `data/raw/<dataset>/` (manifest: `data/raw/extraction_manifest.json`).
 
