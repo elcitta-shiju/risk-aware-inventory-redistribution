@@ -1,8 +1,6 @@
 # Dashboard walkthrough and team guide
 
-This guide explains the whole project and every part of the dashboard in simple English. It is written for
-our team, so that every one of us can explain, demo and defend the project.
-
+This guide explains the whole project and every part of the dashboard in simple English. 
 **How to open the dashboard** (from PowerShell):
 
 ```powershell
