@@ -1,6 +1,5 @@
 # Risk-Aware Adaptive Inventory Redistribution Using Uncertainty-Aware Demand Forecasting
 
-Final-year project, B.Tech Artificial Intelligence and Data Science, Project Phase 1 (ADD 415).
 
 ## The problem
 
