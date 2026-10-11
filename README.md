@@ -71,7 +71,7 @@ Moving stock between stores can save those lost sales, but every shipment costs 
 
 ## Dataset
 
-**Main dataset:** Mendeley Data, *"Retail Transactions and Stocks Data"*:
+Mendeley Data, *"Retail Transactions and Stocks Data"*:
 - 125,751 sales transactions and 284,755 stock records;
 - 40 stores and 2,326 products;
 - 1 June 2025 to 24 April 2026.
@@ -79,11 +79,6 @@ Moving stock between stores can save those lost sales, but every shipment costs 
 It was chosen because it has both sales **and** stock histories, the same product is sold in many stores
 (which is needed for transfers), and the two files agree with each other.
 
-**Why Kaggle was not the main dataset:** two Kaggle retail datasets were checked and not used.
-- One reports units sold **greater than demand** in 27.6% of rows, which is impossible.
-- The other looks **randomly generated**: sales show no week-to-week pattern, and its "demand forecast" is
-  almost identical to same-day sales.
-- Their store and product codes and years also do not match the Mendeley data.
 
 Details: [docs/data_audit.md](docs/data_audit.md).
 
