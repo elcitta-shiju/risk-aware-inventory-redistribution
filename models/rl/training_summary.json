@@ -1,0 +1,104 @@
+{
+  "rl_config": {
+    "algorithm": "PPO",
+    "total_timesteps": 200000,
+    "seeds": [
+      0,
+      1,
+      2,
+      3,
+      4
+    ],
+    "n_envs": 8,
+    "eval_freq_steps": 20000,
+    "learning_rate": 0.0003,
+    "n_steps": 256,
+    "batch_size": 256,
+    "gamma": 0.97,
+    "ent_coef": 0.0,
+    "hidden": 64,
+    "log_std_init": -1.0
+  },
+  "runs": [
+    {
+      "use_uncertainty": false,
+      "seed": 0,
+      "train_seconds": 259.4,
+      "best_val_saving_poisson": 419.4287941204525,
+      "timesteps": 200000,
+      "variant": "rl_point"
+    },
+    {
+      "use_uncertainty": false,
+      "seed": 1,
+      "train_seconds": 347.4,
+      "best_val_saving_poisson": 568.6623453843733,
+      "timesteps": 200000,
+      "variant": "rl_point"
+    },
+    {
+      "use_uncertainty": false,
+      "seed": 2,
+      "train_seconds": 370.6,
+      "best_val_saving_poisson": 578.4031654808783,
+      "timesteps": 200000,
+      "variant": "rl_point"
+    },
+    {
+      "use_uncertainty": false,
+      "seed": 3,
+      "train_seconds": 277.3,
+      "best_val_saving_poisson": 526.0934311705122,
+      "timesteps": 200000,
+      "variant": "rl_point"
+    },
+    {
+      "use_uncertainty": false,
+      "seed": 4,
+      "train_seconds": 246.0,
+      "best_val_saving_poisson": 749.7941524455101,
+      "timesteps": 200000,
+      "variant": "rl_point"
+    },
+    {
+      "use_uncertainty": true,
+      "seed": 0,
+      "train_seconds": 282.9,
+      "best_val_saving_poisson": 955.7690107665373,
+      "timesteps": 200000,
+      "variant": "rl_uncertainty"
+    },
+    {
+      "use_uncertainty": true,
+      "seed": 1,
+      "train_seconds": 358.0,
+      "best_val_saving_poisson": 547.4649027077846,
+      "timesteps": 200000,
+      "variant": "rl_uncertainty"
+    },
+    {
+      "use_uncertainty": true,
+      "seed": 2,
+      "train_seconds": 368.7,
+      "best_val_saving_poisson": 962.0593765149818,
+      "timesteps": 200000,
+      "variant": "rl_uncertainty"
+    },
+    {
+      "use_uncertainty": true,
+      "seed": 3,
+      "train_seconds": 254.3,
+      "best_val_saving_poisson": 670.8786921803155,
+      "timesteps": 200000,
+      "variant": "rl_uncertainty"
+    },
+    {
+      "use_uncertainty": true,
+      "seed": 4,
+      "train_seconds": 250.4,
+      "best_val_saving_poisson": 915.7685929929834,
+      "timesteps": 200000,
+      "variant": "rl_uncertainty"
+    }
+  ]
+}

@@ -3,6 +3,7 @@
 .venv-*/
 venv/
 .env
+.streamlit/secrets.toml
 
 # Python caches
 __pycache__/
@@ -11,19 +12,33 @@ __pycache__/
 *.egg-info/
 .ipynb_checkpoints/
 
-# Data (originals live outside the repo; extracted/processed copies are regenerated)
+# Data. Original and extracted raw datasets are never committed (licence not confirmed, files are large).
+# The small processed tables that the dashboard reads ARE committed, so it runs without the pipeline.
 data/raw/*
 data/interim/*
 data/processed/*
 !data/**/.gitkeep
+!data/processed/panel.parquet
+!data/processed/forecasts.parquet
+!data/processed/risk.parquet
+!data/processed/unit_economics.csv
 
-# Generated artifacts (regenerate via scripts/run_pipeline.py)
+# Generated artifacts (regenerate via scripts/run_pipeline.py).
+# Exception: the trained RL agents' selected checkpoints and their metadata, needed by the dashboard.
 models/*
 !models/.gitkeep
+!models/forecast_config.json
+!models/rl/
+models/rl/*/*
+!models/rl/*/best_model.zip
+!models/rl/*/meta.json
+!models/rl/*/validation_curve.csv
 results/**/*.parquet
 results/cache/
 logs/
+*.log
 *.zip
+!models/rl/*/best_model.zip
 
 # Editors / OS
 .vscode/

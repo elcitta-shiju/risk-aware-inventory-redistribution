@@ -1,0 +1,7 @@
+{
+  "use_uncertainty": false,
+  "seed": 0,
+  "train_seconds": 259.4,
+  "best_val_saving_poisson": 419.4287941204525,
+  "timesteps": 200000
+}

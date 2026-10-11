@@ -1,0 +1,116 @@
+{
+  "point_model": {
+    "objective": "poisson",
+    "n_estimators": 300,
+    "learning_rate": 0.05,
+    "num_leaves": 31,
+    "min_child_samples": 20,
+    "subsample": 0.8,
+    "subsample_freq": 1,
+    "colsample_bytree": 0.8,
+    "verbose": -1
+  },
+  "quantile_levels": [
+    0.1,
+    0.9
+  ],
+  "interval_method": "poisson",
+  "alpha": 0.2,
+  "calibration_weeks": 8,
+  "selection_grid_val": [
+    {
+      "objective": "poisson",
+      "num_leaves": 31,
+      "MAE": 0.26974756770400216,
+      "RMSE": 0.474377464093855,
+      "WAPE": 1.595549383831436,
+      "Bias": 0.055945687976968965
+    },
+    {
+      "objective": "poisson",
+      "num_leaves": 7,
+      "MAE": 0.2744503213337521,
+      "RMSE": 0.4822473479594697,
+      "WAPE": 1.6233660411608255,
+      "Bias": 0.056272420673762036
+    },
+    {
+      "objective": "poisson",
+      "num_leaves": 15,
+      "MAE": 0.27257439492817054,
+      "RMSE": 0.4858404747672555,
+      "WAPE": 1.6122699884845575,
+      "Bias": 0.05818397935878508
+    },
+    {
+      "objective": "regression",
+      "num_leaves": 7,
+      "MAE": 0.28618908393626014,
+      "RMSE": 0.4893395961758523,
+      "WAPE": 1.6928004964806516,
+      "Bias": 0.07441696196725597
+    },
+    {
+      "objective": "regression",
+      "num_leaves": 31,
+      "MAE": 0.2888492961167003,
+      "RMSE": 0.4993762732609178,
+      "WAPE": 1.7085355777697615,
+      "Bias": 0.0804595078540814
+    },
+    {
+      "objective": "regression",
+      "num_leaves": 15,
+      "MAE": 0.29246866885432243,
+      "RMSE": 0.5052391124764354,
+      "WAPE": 1.7299440671605024,
+      "Bias": 0.08419989114919971
+    }
+  ],
+  "features": [
+    "f_lag_1",
+    "f_lag_2",
+    "f_lag_3",
+    "f_lag_4",
+    "f_lag_8",
+    "f_roll_mean_4",
+    "f_roll_std_4",
+    "f_roll_mean_8",
+    "f_roll_std_8",
+    "f_expanding_mean",
+    "f_weeks_since_sale",
+    "f_promo_share_lag_1",
+    "f_opening_stock",
+    "f_cover_weeks",
+    "f_group_total_lag_1",
+    "f_store_total_lag_1",
+    "f_weekofyear",
+    "f_month",
+    "f_store",
+    "f_group"
+  ],
+  "feature_importance_gain_last_origin": {
+    "f_cover_weeks": 42647.57,
+    "f_group_total_lag_1": 37203.0,
+    "f_group": 33589.54,
+    "f_opening_stock": 28395.42,
+    "f_weekofyear": 14157.78,
+    "f_expanding_mean": 9597.69,
+    "f_store_total_lag_1": 8760.57,
+    "f_store": 5846.95,
+    "f_weeks_since_sale": 5282.91,
+    "f_roll_mean_8": 4390.21,
+    "f_roll_mean_4": 3944.33,
+    "f_roll_std_8": 2835.35,
+    "f_month": 2343.24,
+    "f_lag_8": 1879.29,
+    "f_roll_std_4": 1233.56,
+    "f_lag_4": 707.46,
+    "f_lag_1": 432.22,
+    "f_lag_2": 349.34,
+    "f_lag_3": 263.78,
+    "f_promo_share_lag_1": 24.63
+  },
+  "n_origins": 38,
+  "first_origin": "2025-07-28"
+}
