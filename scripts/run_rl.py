@@ -1,7 +1,7 @@
 """Stage 8: train PPO agents (point-forecast vs uncertainty-aware observations) over several seeds.
 
 Outputs: models/rl/{variant}_seed{k}/best_model.zip, final_model.zip, validation_curve.csv, meta.json
-Usage:  python scripts/run_rl.py [--timesteps N] [--seeds 0 1 2]
+Usage:  python scripts/run_rl.py [--timesteps N] [--seeds 0 1 2 3 4] [--variants rl_point rl_uncertainty]
 """
 
 import _bootstrap  # noqa: F401

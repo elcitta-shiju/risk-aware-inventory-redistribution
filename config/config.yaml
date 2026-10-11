@@ -63,6 +63,14 @@ costs:
   holding_rate_per_year: 0.25     # fraction of unit cost per year
   shortage_cost_multiplier: 1.0   # lost sale costs 1.0 x observed unit margin
 
+sensitivity:
+  # One-at-a-time variation of the ASSUMED cost parameters (scripts/run_sensitivity.py).
+  # The base value of each parameter is taken from `costs` above and is always included.
+  transfer_fixed: [2.0, 4.0, 16.0, 32.0]
+  transfer_per_unit_km: [0.0075, 0.015, 0.06, 0.12]
+  holding_rate_per_year: [0.10, 0.50, 1.00]
+  shortage_cost_multiplier: [0.5, 2.0, 3.0]
+
 environment:
   horizon_weeks: 8                # episode length (= length of val and test periods)
   max_target_offset: 2.0          # RL action a in [-1,1] -> target = round(yhat + 2a) units
@@ -74,7 +82,7 @@ environment:
 rl:
   algorithm: PPO
   total_timesteps: 200000
-  seeds: [0, 1, 2]
+  seeds: [0, 1, 2, 3, 4]
   n_envs: 8
   eval_freq_steps: 20000          # validation evaluation for checkpoint selection
   learning_rate: 0.0003

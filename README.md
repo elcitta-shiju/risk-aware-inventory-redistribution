@@ -29,13 +29,14 @@ extracted into `data/raw/`.
 | PPO with a shared per-store policy | `inventory_rl.agents.{ppo,policy}` | `run_rl.py` |
 | Rule-based baselines | `inventory_rl.baselines.rules` | `run_evaluation.py` |
 | Evaluation, report | `inventory_rl.evaluation.*` | `run_evaluation.py` |
+| Cost-assumption sensitivity | `inventory_rl.evaluation.sensitivity` | `run_sensitivity.py` |
 | Dashboard | `dashboard/app.py` | `streamlit run dashboard/app.py` |
 
 ## Quick start (Windows PowerShell)
 ```powershell
 cd "C:\Users\ElcittaShiju\OneDrive\Desktop\Main project\prototype"
 .\.venv\Scripts\Activate.ps1
-python scripts/run_pipeline.py            # full pipeline (~35 min; add --skip-rl to reuse trained agents)
+python scripts/run_pipeline.py            # full pipeline (~1 h; add --skip-rl to reuse trained agents)
 python -m pytest                          # run the tests
 streamlit run dashboard/app.py            # open http://localhost:8501
 ```

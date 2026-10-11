@@ -16,8 +16,8 @@ performance in a live retail operation.
 | Rule-based (point) | 0.89 | 0.27 | 260.55 | 2,730.31 | 4,681.55 | 23,647.59 | -186.54 | 559.95 | 465.65 | 477.35 | 66.79 | 0.00 |
 | Rule-based (upper bound) | 0.89 | 0.27 | 247.35 | 2,700.35 | 2,913.41 | 21,185.08 | 2,275.97 | 641.12 | 277.80 | 325.15 | 70.91 | 0.00 |
 | Rule-based (CQR bound) | 0.88 | 0.28 | 275.20 | 2,709.99 | 2,005.98 | 21,476.31 | 1,984.74 | 389.67 | 196.70 | 213.30 | 67.69 | 0.00 |
-| RL (point forecast) | 0.87 | 0.29 | 296.12 | 2,719.27 | 1,220.12 | 21,616.54 | 1,844.51 | 387.92 | 120.20 | 126.65 | 68.33 | 0.00 |
-| RL (forecast + uncertainty) | 0.87 | 0.29 | 287.13 | 2,714.81 | 1,480.83 | 21,432.74 | 2,028.31 | 438.32 | 145.13 | 155.05 | 69.06 | 0.00 |
+| RL (point forecast) | 0.87 | 0.29 | 293.47 | 2,717.76 | 1,303.61 | 21,576.29 | 1,884.76 | 410.37 | 128.54 | 135.61 | 67.97 | 0.00 |
+| RL (forecast + uncertainty) | 0.87 | 0.29 | 287.25 | 2,714.98 | 1,473.83 | 21,440.14 | 2,020.92 | 424.63 | 144.46 | 154.65 | 68.79 | 0.00 |
 
 
 ## Policy comparison - Historical replay (observed, stock-censored sales as demand)
@@ -28,20 +28,20 @@ performance in a live retail operation.
 | Rule-based (point) | 0.92 | 0.22 | 182.00 | 2,671.25 | 4,149.04 | 19,492.15 | -2,494.79 | nan | 410.00 | 410.00 | 70.65 | 0.00 |
 | Rule-based (upper bound) | 0.93 | 0.22 | 167.00 | 2,641.62 | 2,017.64 | 16,504.24 | 493.12 | nan | 187.00 | 210.00 | 82.80 | 0.00 |
 | Rule-based (CQR bound) | 0.93 | 0.22 | 166.00 | 2,641.00 | 1,212.99 | 15,666.63 | 1,330.74 | nan | 113.00 | 114.00 | 90.35 | 0.00 |
-| RL (point forecast) | 0.92 | 0.23 | 179.00 | 2,647.88 | 800.26 | 15,939.72 | 1,057.64 | 18.03 | 76.00 | 76.00 | 84.27 | 0.00 |
-| RL (forecast + uncertainty) | 0.92 | 0.23 | 173.67 | 2,644.54 | 974.07 | 15,846.78 | 1,150.58 | 148.50 | 92.67 | 92.67 | 83.94 | 0.00 |
+| RL (point forecast) | 0.92 | 0.23 | 177.60 | 2,646.80 | 846.22 | 15,916.11 | 1,081.26 | 99.49 | 80.20 | 80.20 | 84.73 | 0.00 |
+| RL (forecast + uncertainty) | 0.92 | 0.23 | 173.60 | 2,644.90 | 955.16 | 15,821.01 | 1,176.35 | 129.17 | 90.60 | 91.20 | 84.34 | 0.00 |
 
 
 ## Paired differences in total saving (same scenarios)
 
 | comparison | mean | 95% CI | n | reading |
 |---|---|---|---|---|
-| RL (forecast + uncertainty) minus RL (point forecast) | poisson | 183.8 | [128.3, 239.3] | 20 | positive (95% CI excludes 0) |
-| RL (forecast + uncertainty) minus RL (point forecast) | replay | 92.9 | [nan, nan] | 1 | single scenario - no interval |
-| RL (forecast + uncertainty) minus Rule-based (upper bound) | poisson | -247.7 | [-442.0, -53.3] | 20 | negative (95% CI excludes 0) |
-| RL (forecast + uncertainty) minus Rule-based (upper bound) | replay | 657.5 | [nan, nan] | 1 | single scenario - no interval |
-| Rule-based (upper bound) minus Rule-based (point) | poisson | 2,462.5 | [2,301.3, 2,623.7] | 20 | positive (95% CI excludes 0) |
-| Rule-based (upper bound) minus Rule-based (point) | replay | 2,987.9 | [nan, nan] | 1 | single scenario - no interval |
+| RL (forecast + uncertainty) minus RL (point forecast), poisson | 136.2 | [88.4, 183.9] | 20 | positive (95% CI excludes 0) |
+| RL (forecast + uncertainty) minus RL (point forecast), replay | 95.1 | [nan, nan] | 1 | single scenario - no interval |
+| RL (forecast + uncertainty) minus Rule-based (upper bound), poisson | -255.1 | [-456.6, -53.5] | 20 | negative (95% CI excludes 0) |
+| RL (forecast + uncertainty) minus Rule-based (upper bound), replay | 683.2 | [nan, nan] | 1 | single scenario - no interval |
+| Rule-based (upper bound) minus Rule-based (point), poisson | 2,462.5 | [2,301.3, 2,623.7] | 20 | positive (95% CI excludes 0) |
+| Rule-based (upper bound) minus Rule-based (point), replay | 2,987.9 | [nan, nan] | 1 | single scenario - no interval |
 
 The CI treats demand scenarios as independent replicates; it does not capture uncertainty
 from the choice of products, period, or cost assumptions.
@@ -53,10 +53,31 @@ from the choice of products, period, or cost assumptions.
 | RL (forecast + uncertainty) | 0 | 2,078.0 | 1,087.5 |
 | RL (forecast + uncertainty) | 1 | 1,754.4 | 1,044.1 |
 | RL (forecast + uncertainty) | 2 | 2,252.6 | 1,320.2 |
+| RL (forecast + uncertainty) | 3 | 1,961.3 | 1,121.1 |
+| RL (forecast + uncertainty) | 4 | 2,058.4 | 1,309.0 |
 | RL (point forecast) | 0 | 1,861.5 | 1,053.2 |
 | RL (point forecast) | 1 | 1,805.5 | 1,042.2 |
 | RL (point forecast) | 2 | 1,866.6 | 1,077.5 |
+| RL (point forecast) | 3 | 1,778.9 | 984.8 |
+| RL (point forecast) | 4 | 2,111.4 | 1,248.5 |
 
+
+Mean +/- std (ddof=1) across training seeds of each seed's mean saving:
+
+| policy | scenario | mean | std | min | max | n_train_seeds |
+|---|---|---|---|---|---|---|
+| RL (forecast + uncertainty) | poisson | 2,020.9 | 182.3 | 1,754.4 | 2,252.6 | 5 |
+| RL (forecast + uncertainty) | replay | 1,176.4 | 129.2 | 1,044.1 | 1,320.2 | 5 |
+| RL (point forecast) | poisson | 1,884.8 | 132.0 | 1,778.9 | 2,111.4 | 5 |
+| RL (point forecast) | replay | 1,081.3 | 99.5 | 984.8 | 1,248.5 | 5 |
+
+
+Seed-level comparison (Welch t-test; each training seed is one replicate):
+
+| comparison | mean difference | Welch t | p-value | seeds |
+|---|---|---|---|---|
+| RL (forecast + uncertainty) minus RL (point forecast), poisson | 136.2 | 1.35 | 0.217 | 5 vs 5 |
+| RL (forecast + uncertainty) minus RL (point forecast), replay | 95.1 | 1.30 | 0.231 | 5 vs 5 |
 
 ## Forecast accuracy (test, one-week-ahead)
 

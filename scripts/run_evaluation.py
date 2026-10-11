@@ -17,6 +17,7 @@ import json
 
 import numpy as np
 import pandas as pd
+from scipy import stats
 
 from inventory_rl.agents.ppo import load_policy
 from inventory_rl.baselines.rules import RuleBasedPolicy, no_transfer
@@ -73,6 +74,8 @@ def main() -> None:
     per_seed = (rl.groupby(["policy", "train_seed", "scenario", "seed"]).saving_vs_noop.sum()
                 .groupby(["policy", "train_seed", "scenario"]).mean().unstack("scenario").reset_index())
     per_seed.to_csv(METRICS_DIR / "rl_saving_per_training_seed.csv", index=False)
+    seed_stats = rl_seed_statistics(per_seed)
+    seed_stats.to_csv(METRICS_DIR / "rl_saving_across_training_seeds.csv", index=False)
 
     # paired comparison: RL-uncertainty vs RL-point and vs best rule, same scenarios
     paired = paired_differences(ep)
@@ -83,6 +86,8 @@ def main() -> None:
         "stores": len(ctx.network.stores), "network_provenance": ctx.network.provenance,
         "summary": summary.assign(policy=summary.policy.astype(str)).to_dict("records"),
         "paired_differences": paired, "missing_rl_checkpoints": missing,
+        "rl_across_training_seeds": seed_stats.to_dict("records"),
+        "rl_seed_level_comparison": seed_level_comparison(per_seed),
         "forecast_test": fc_metrics["test"], "intervals_test": int_metrics["by_split"]["test"],
         "interval_method": int_metrics["chosen"],
     }
@@ -109,6 +114,31 @@ def main() -> None:
     write_report(results, summary, per_seed)
     print(summary[["policy", "scenario", "fill_rate", "lost_units", "transfer_cost", "total_cost",
                    "saving_vs_noop", "saving_vs_noop_std", "units_transferred"]].round(2).to_string(index=False))
+
+
+def rl_seed_statistics(per_seed: pd.DataFrame) -> pd.DataFrame:
+    """Mean +/- std (ddof=1) across training seeds of each seed's mean test saving."""
+    long = per_seed.melt(id_vars=["policy", "train_seed"], value_vars=["poisson", "replay"],
+                         var_name="scenario", value_name="saving")
+    g = long.groupby(["policy", "scenario"]).saving
+    return pd.DataFrame({"mean": g.mean(), "std": g.std(ddof=1), "min": g.min(), "max": g.max(),
+                         "n_train_seeds": g.size()}).reset_index()
+
+
+def seed_level_comparison(per_seed: pd.DataFrame, a: str = "RL (forecast + uncertainty)",
+                          b: str = "RL (point forecast)") -> dict:
+    """Welch t-test on per-training-seed mean savings (seeds are the replicates, not scenarios)."""
+    out = {}
+    for scen in ("poisson", "replay"):
+        xa = per_seed.loc[per_seed.policy == a, scen].to_numpy()
+        xb = per_seed.loc[per_seed.policy == b, scen].to_numpy()
+        if len(xa) < 2 or len(xb) < 2:
+            continue
+        t = stats.ttest_ind(xa, xb, equal_var=False)
+        out[f"{a} minus {b} | {scen}"] = {"mean_diff": float(xa.mean() - xb.mean()), "welch_t": float(t.statistic),
+                                          "p_value": float(t.pvalue), "n_seeds_a": int(len(xa)),
+                                          "n_seeds_b": int(len(xb))}
+    return out
 
 
 def paired_differences(ep: pd.DataFrame) -> dict:

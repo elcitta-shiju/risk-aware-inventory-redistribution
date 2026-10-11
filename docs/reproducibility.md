@@ -5,9 +5,13 @@
 - **Use Python 3.12, not 3.13.** On the development machine, Python 3.13.15 with this package set crashed
   natively inside `asyncio` (access violation) once Streamlit was imported, so the dashboard could not start.
   Under 3.12.10 the same pinned packages work. All processed data and the evaluation summary were
-  regenerated under 3.12 and are identical to the earlier 3.13 outputs. The RL agents were trained under 3.13;
-  they load and reproduce the same evaluation under 3.12, and training itself was smoke-tested under 3.12.
-- Seeds: `seed: 42` (forecasting), RL seeds `[0, 1, 2]`, evaluation scenario seeds 10,000–10,019,
+  regenerated under 3.12 and are identical to the earlier 3.13 outputs. RL seeds 0–2 were trained under 3.13;
+  they load and reproduce the same evaluation under 3.12. Seeds 3–4 were trained under 3.12 with the same
+  package versions. Whether retraining seeds 0–2 under 3.12 gives bit-identical checkpoints was **not
+  verified** (the comparison run was stopped because the laptop ran low on memory).
+- Memory: the development laptop has 8 GB RAM. Train RL runs one at a time
+  (`python scripts/run_rl.py --seeds 3 --variants rl_point`) if other applications are open.
+- Seeds: `seed: 42` (forecasting), RL seeds `[0, 1, 2, 3, 4]`, evaluation scenario seeds 10,000–10,019,
   validation scenario seeds 20,000+, simulated store locations seed 7. All are set in code or config.
 - LightGBM uses multithreading. Results are deterministic for a fixed thread count; tiny differences
   across machines are possible.
@@ -27,8 +31,8 @@ copy .env.example .env                # then edit INVENTORY_DATA_DIR if your arc
 
 ## Full run
 ```powershell
-python scripts/run_pipeline.py                    # ~35 min total (RL training is ~27 min)
-python -m pytest                                  # 71 tests
+python scripts/run_pipeline.py                    # ~1 h total (RL training ~50 min, sensitivity ~13 min)
+python -m pytest                                  # 76 tests
 streamlit run dashboard/app.py
 ```
 
@@ -41,7 +45,8 @@ streamlit run dashboard/app.py
 | Forecasts + intervals | `python scripts/run_forecasting.py` | `data/processed/forecasts.parquet`, `models/forecast_config.json`, `results/metrics/{forecast,interval}_metrics.json` |
 | Risk + network | `python scripts/run_risk.py` | `data/processed/risk.parquet`, `results/metrics/{imbalance.csv,risk_summary.json,store_network.csv}` |
 | RL training | `python scripts/run_rl.py` (`--timesteps 20000 --seeds 0` for a quick run) | `models/rl/*/{best_model.zip,validation_curve.csv,meta.json}` |
-| Evaluation | `python scripts/run_evaluation.py` | `results/metrics/{evaluation_summary.csv,results.json}`, `results/reports/evaluation_report.md`, figures |
+| Evaluation | `python scripts/run_evaluation.py` | `results/metrics/{evaluation_summary.csv,results.json,rl_saving_across_training_seeds.csv}`, `results/reports/evaluation_report.md`, figures |
+| Cost sensitivity | `python scripts/run_sensitivity.py` (~13 min; `--report-only` rebuilds the report from the CSV) | `results/metrics/cost_sensitivity.csv`, `results/figures/cost_sensitivity.png`, `results/reports/cost_sensitivity_report.md` |
 
 Each stage reads only earlier stages' artifacts, so a stage can be rerun alone. Generated data and
 models are git-ignored and can be fully regenerated from the original archives.

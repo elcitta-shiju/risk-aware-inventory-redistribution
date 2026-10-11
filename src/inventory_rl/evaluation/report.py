@@ -11,7 +11,7 @@ COLS = ["policy", "fill_rate", "stockout_rate", "lost_units", "avg_closing_stock
         "invalid_action_rate"]
 
 
-def _md_table(df: pd.DataFrame, digits: int = 3) -> str:
+def md_table(df: pd.DataFrame, digits: int = 3) -> str:
     df = df.copy()
     head = "| " + " | ".join(df.columns) + " |\n|" + "---|" * len(df.columns) + "\n"
     rows = []
@@ -43,21 +43,31 @@ def write_report(results: dict, summary: pd.DataFrame, per_seed: pd.DataFrame) -
     for scen, desc in [("poisson", "Poisson demand scenarios (mean +/- std over scenario x training seed)"),
                        ("replay", "Historical replay (observed, stock-censored sales as demand)")]:
         s = summary[summary.scenario == scen]
-        lines += [f"## Policy comparison - {desc}", "", _md_table(s[[c for c in COLS if c in s]].assign(
+        lines += [f"## Policy comparison - {desc}", "", md_table(s[[c for c in COLS if c in s]].assign(
             policy=lambda d: d.policy.astype(str)), 2), ""]
     lines += ["## Paired differences in total saving (same scenarios)", "",
               "| comparison | mean | 95% CI | n | reading |", "|---|---|---|---|---|"]
     for k, d in results["paired_differences"].items():
-        lines.append(f"| {k} | {d['mean']:,.1f} | [{d['ci95_low']:,.1f}, {d['ci95_high']:,.1f}] | "
+        lines.append(f"| {k.replace(' | ', ', ')} | {d['mean']:,.1f} | [{d['ci95_low']:,.1f}, {d['ci95_high']:,.1f}] | "
                      f"{d['n_scenarios']} | {_verdict(d)} |")
     lines += ["", "The CI treats demand scenarios as independent replicates; it does not capture uncertainty",
               "from the choice of products, period, or cost assumptions.", "",
               "## RL robustness across training seeds (mean saving per scenario)", "",
-              _md_table(per_seed.round(1), 1), "",
-              "## Forecast accuracy (test, one-week-ahead)", "",
-              _md_table(pd.DataFrame(results["forecast_test"]).T.reset_index().rename(columns={"index": "model"}), 4),
+              md_table(per_seed.round(1), 1), ""]
+    if results.get("rl_across_training_seeds"):
+        lines += ["Mean +/- std (ddof=1) across training seeds of each seed's mean saving:", "",
+                  md_table(pd.DataFrame(results["rl_across_training_seeds"]), 1), ""]
+    if results.get("rl_seed_level_comparison"):
+        lines += ["Seed-level comparison (Welch t-test; each training seed is one replicate):", "",
+                  "| comparison | mean difference | Welch t | p-value | seeds |", "|---|---|---|---|---|"]
+        for k, d in results["rl_seed_level_comparison"].items():
+            lines.append(f"| {k.replace(' | ', ', ')} | {d['mean_diff']:,.1f} | {d['welch_t']:.2f} | {d['p_value']:.3f} | "
+                         f"{d['n_seeds_a']} vs {d['n_seeds_b']} |")
+        lines.append("")
+    lines += ["## Forecast accuracy (test, one-week-ahead)", "",
+              md_table(pd.DataFrame(results["forecast_test"]).T.reset_index().rename(columns={"index": "model"}), 4),
               "", "## Prediction intervals (test)", "",
-              _md_table(pd.DataFrame(results["intervals_test"]).T.reset_index().rename(columns={"index": "method"}), 3)]
+              md_table(pd.DataFrame(results["intervals_test"]).T.reset_index().rename(columns={"index": "method"}), 3)]
     if results["missing_rl_checkpoints"]:
         lines += ["", "**Warning:** missing RL checkpoints: " + ", ".join(results["missing_rl_checkpoints"])]
     REPORTS_DIR.mkdir(parents=True, exist_ok=True)

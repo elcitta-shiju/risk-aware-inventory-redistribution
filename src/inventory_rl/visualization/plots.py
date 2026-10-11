@@ -82,3 +82,33 @@ def line_curves(df: pd.DataFrame, x: str, ys: list[str], path: Path, title: str,
     ax.set(title=title, xlabel=x, ylabel=ylabel)
     ax.legend(fontsize=8)
     return _save(fig, path)
+
+
+def sensitivity_panels(res: pd.DataFrame, base: dict, policies: list[str], path: Path) -> Path:
+    """One panel per cost parameter: mean saving vs parameter value (log x), error bars = std across
+    training seeds where available (RL)."""
+    params = [p for p in res.parameter.unique() if p != "base"]
+    ncols = 2
+    nrows = -(-len(params) // ncols)
+    fig, axes = plt.subplots(nrows, ncols, figsize=(11, 4 * nrows), squeeze=False)
+    colors = [GREY, BLUE, GREEN, ORANGE, RED]
+    for ax, param in zip(axes.ravel(), params):
+        sub = res[(res.parameter == param) | (res.parameter == "base")].copy()
+        sub["value"] = sub.value.fillna(float(base[param]))
+        for pol, c in zip(policies, colors):
+            d = sub[sub.policy == pol].sort_values("value")
+            if d.empty:
+                continue
+            ax.errorbar(d.value, d.saving_mean, yerr=d.saving_std_train_seeds.fillna(0), color=c, marker="o",
+                        ms=3, capsize=3, label=pol)
+        ax.axvline(float(base[param]), color=GREY, ls=":", lw=1)
+        ax.axhline(0, color="black", lw=0.6)
+        ax.set_xscale("log")
+        ticks = sorted(sub.value.unique())
+        ax.set_xticks(ticks, [f"{t:g}" for t in ticks])
+        ax.minorticks_off()
+        ax.set(title=param, xlabel="value (dotted = base)", ylabel="saving vs no redistribution")
+    for ax in axes.ravel()[len(params):]:
+        ax.set_visible(False)
+    axes[0][0].legend(fontsize=7)
+    return _save(fig, path)

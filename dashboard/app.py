@@ -198,6 +198,10 @@ with tabs[5]:
         st.dataframe(summ[summ.scenario == scen][show].round(3), hide_index=True, use_container_width=True)
         st.markdown("**Paired differences in saving (same scenarios)**")
         st.dataframe(pd.DataFrame(res["paired_differences"]).T.round(1), use_container_width=True)
+        if res.get("rl_across_training_seeds"):
+            st.markdown("**RL saving across training seeds (mean ± std of per-seed means)**")
+            seeds = pd.DataFrame(res["rl_across_training_seeds"])
+            st.dataframe(seeds[seeds.scenario == scen].round(1), hide_index=True, use_container_width=True)
         if res.get("missing_rl_checkpoints"):
             st.warning("Some RL checkpoints were missing at evaluation time.")
         for f in [f"eval_saving_{scen}.png", f"eval_fill_rate_{scen}.png", "rl_validation_curves.png"]:
@@ -207,6 +211,12 @@ with tabs[5]:
         if rep.exists():
             with st.expander("Generated evaluation report"):
                 st.markdown(rep.read_text(encoding="utf-8"))
+        sens = REPORTS_DIR / "cost_sensitivity_report.md"
+        if sens.exists():
+            with st.expander("Cost-assumption sensitivity (generated)"):
+                if da.figure("cost_sensitivity.png"):
+                    st.image(str(da.figure("cost_sensitivity.png")))
+                st.markdown(sens.read_text(encoding="utf-8"))
 
 # ------------------------------------------------------------------------------------- assumptions
 with tabs[6]:

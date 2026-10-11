@@ -22,6 +22,7 @@ STAGES = [
     ("risk", "run_risk.py"),
     ("rl", "run_rl.py"),
     ("evaluation", "run_evaluation.py"),
+    ("sensitivity", "run_sensitivity.py"),
 ]
 
 if __name__ == "__main__":

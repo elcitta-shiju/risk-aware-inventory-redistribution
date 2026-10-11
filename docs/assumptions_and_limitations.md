@@ -36,8 +36,11 @@ All assumptions are configurable in `config/config.yaml`.
 6. **Simulation only.** The RL agent is trained and evaluated in a simulator built from historical data.
    Nothing here is validated in a live retail operation.
 7. **Statistical scope of comparisons.** Confidence intervals treat demand scenarios as replicates. They do
-   not cover uncertainty from the cost assumptions, SKU selection or time period. Results are sensitive
-   to the transfer-cost parameters.
+   not cover uncertainty from the cost assumptions, SKU selection or time period. A one-at-a-time cost
+   sensitivity analysis (`results/reports/cost_sensitivity_report.md`) shows that the policy ranking
+   changes with the transfer-cost and lost-sale parameters. RL agents in that analysis were trained under
+   the base costs only and were not retrained per setting. With 5 training seeds per RL variant, the
+   seed-level comparison of the two RL variants is not statistically significant.
 8. **Novelty.** No claim of novelty or superiority over the literature is made. Positioning against
    prior work (e.g., the IEEE papers collected in `project data/ieee papers`) requires a literature review.
 9. **Dataset licences** were not included in the archives and must be confirmed on the source pages.

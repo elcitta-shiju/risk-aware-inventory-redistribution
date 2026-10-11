@@ -111,11 +111,16 @@ Design iterations, all executed and kept in the history:
 PPO (Stable-Baselines3 2.9) with a **parameter-shared per-store actor** (`agents/policy.py`): the same
 small network maps each store's features plus a mean/max-pooled network embedding to that store's
 action, deep-sets style. This makes the policy permutation-equivariant across stores. Training settings:
-8 parallel training-split environments, 200k steps, γ = 0.97, 3 seeds per variant. Every 20k steps the
+8 parallel training-split environments, 200k steps, γ = 0.97, 5 seeds per variant (0–4). Every 20k steps the
 deterministic policy is evaluated on the validation split, and the best checkpoint is kept (selection
 uses validation only).
 
 ## 8. Baselines and evaluation (Stages 9–10)
+RL results are reported as mean ± std across the 5 training seeds (each seed's value is its mean over
+the 20 test demand scenarios), together with a Welch t-test that treats training seeds as replicates.
+A one-at-a-time cost sensitivity analysis (`scripts/run_sensitivity.py`) re-evaluates every policy with
+one assumed cost parameter changed (grid in `config.yaml` → `sensitivity`).
+
 Policies:
 - No redistribution.
 - Rule-based with target = ceil(ŷ) (*point*), Poisson upper bound (*upper*), or CQR upper bound (*cqr*).
