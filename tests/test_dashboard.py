@@ -32,14 +32,24 @@ def test_dashboard_app_compiles():
 
 
 def test_dashboard_runs_headless_on_artifacts():
-    """Executes the whole app script (all tabs) against the generated artifacts, if present."""
+    """Executes the whole app script (all tabs) against the generated artifacts, if present.
+
+    Runs in a subprocess so that a native crash of the Streamlit runtime is reported as a test
+    failure instead of terminating the whole pytest session."""
+    import subprocess
+
     import pytest
 
     da = _load_data_access()
     if not da.artifact_status().available.all():
         pytest.skip("pipeline artifacts not generated yet")
-    from streamlit.testing.v1 import AppTest
-
-    at = AppTest.from_file(str(DASH / "app.py"), default_timeout=120).run()
-    assert not at.exception, [e.value for e in at.exception]
-    assert len(at.tabs) == 7
+    code = (
+        "from streamlit.testing.v1 import AppTest\n"
+        f"at = AppTest.from_file({str(DASH / 'app.py')!r}, default_timeout=180).run()\n"
+        "assert not at.exception, [e.value for e in at.exception]\n"
+        "assert len(at.tabs) == 7\n"
+        "print('APPTEST_OK')\n"
+    )
+    r = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, timeout=600)
+    assert r.returncode == 0 and "APPTEST_OK" in r.stdout, (
+        f"exit code {r.returncode} (3221225477 / 139 = native access violation)\n{r.stderr[-2000:]}")
