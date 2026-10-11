@@ -213,7 +213,7 @@ python -m pytest                    # run the tests
 
 See [docs/assumptions_and_limitations.md](docs/assumptions_and_limitations.md).
 
-## Future scope (Phase 2)
+## Future scope 
 
 - Use **real store locations** and road distances, and the retailer's **real shipping and holding costs**.
 - Add **delivery delays**, truck capacities, and shipping several products together.
@@ -222,13 +222,4 @@ See [docs/assumptions_and_limitations.md](docs/assumptions_and_limitations.md).
 - Extend to more products and a longer history (a full year of seasons).
 - Run a **pilot in a few real stores** and compare with the simulated results.
 
-## Team
 
-- Amith Joseph Sabu
-- Devna A
-- Elcitta Shiju
-- Kevin B Joseph
-
-**Guide:** Ms. Saritha M.S.
-
-Department of Artificial Intelligence and Data Science, Project Phase 1 (ADD 415).
