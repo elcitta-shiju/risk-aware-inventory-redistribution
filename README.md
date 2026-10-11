@@ -146,13 +146,12 @@ data/processed/           small processed tables the dashboard reads (raw data i
 models/                   trained AI agents (selected versions) and forecast settings
 results/                  metrics, reports and figures produced by the pipeline
 docs/                     data audit, data dictionary, methodology, experiments, limitations,
-                          reproducibility, and the team guide to the dashboard
+                          reproducibility
 notebooks/                walkthrough notebook
 tests/                    automated tests (pytest)
 ```
 
 Useful documents:
-- [Dashboard walkthrough and team guide](docs/dashboard_walkthrough.md)
 - [Methodology](docs/methodology.md)
 - [Assumptions and limitations](docs/assumptions_and_limitations.md)
 - [Reproducibility](docs/reproducibility.md)
