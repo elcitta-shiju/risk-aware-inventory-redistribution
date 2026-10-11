@@ -52,3 +52,29 @@ def figure(name: str) -> Path | None:
 def rl_checkpoints() -> list[Path]:
     d = MODELS_DIR / "rl"
     return sorted(d.glob("*/best_model.zip")) if d.exists() else []
+
+
+def product_labels(groups: list[str]) -> dict[str, str]:
+    """Readable product names ('<subcategory> (<code>)') from the extracted sales file, if available."""
+    raw = PROCESSED_DIR.parent / "raw" / "mendeley_retail_transactions_stocks" / "retail_sales_ml_apl.csv"
+    names: dict[str, str] = {}
+    if raw.exists():
+        try:
+            df = pd.read_csv(raw, usecols=["Product No", "Product Subcategory"]).drop_duplicates("Product No")
+            names = dict(zip(df["Product No"], df["Product Subcategory"]))
+        except (ValueError, OSError):
+            names = {}
+    return {g: f"{names[g]} ({g})" if g in names else g for g in groups}
+
+
+def best_validation_run(variant: str = "rl_uncertainty") -> Path | None:
+    """Checkpoint of the training run with the best VALIDATION score (test results are not used)."""
+    summary = load_json(MODELS_DIR / "rl" / "training_summary.json")
+    if not summary:
+        return None
+    runs = [r for r in summary["runs"] if r.get("variant") == variant]
+    for run in sorted(runs, key=lambda r: -r["best_val_saving_poisson"]):
+        path = MODELS_DIR / "rl" / f"{variant}_seed{run['seed']}" / "best_model.zip"
+        if path.exists():
+            return path
+    return None

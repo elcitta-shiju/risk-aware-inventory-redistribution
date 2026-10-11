@@ -1,0 +1,7 @@
+# Dashboard theme: white background, dark text (read when launching from the project root).
+[theme]
+base = "light"
+backgroundColor = "#FFFFFF"
+secondaryBackgroundColor = "#F4F6F8"
+textColor = "#1F2933"
+primaryColor = "#2A6F97"

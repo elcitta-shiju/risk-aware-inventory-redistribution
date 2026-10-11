@@ -24,7 +24,7 @@ _Last updated: 2026-10-11 (session 1, after 5-seed RL and cost sensitivity)._ On
 | 9 Baselines | ✅ | no-transfer + 3 rule variants |
 | 10 Test evaluation | ✅ | `results/metrics/results.json`, `results/reports/evaluation_report.md` (RL mean ± std across 5 seeds, Welch test) |
 | 10b Cost sensitivity | ✅ | 15 one-at-a-time cost settings; `results/reports/cost_sensitivity_report.md`, `results/figures/cost_sensitivity.png` |
-| 11 Dashboard | ✅ | real `streamlit run` server starts; the headless test runs all 7 tabs on real artifacts |
+| 11 Dashboard | ✅ | redesigned for store managers (5 tabs: Decision Support, Store Overview, Results, About, Technical Details; light theme in `.streamlit/config.toml`). Real server checked in a browser: all tabs load without errors; the headless test exercises every tab and the main selections |
 | 12 Tests | ✅ | see the last test run recorded in the latest commit message |
 | 13 Docs | ✅ | README, `docs/*.md` incl. `experiments.md` |
 
