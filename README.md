@@ -39,7 +39,9 @@ python scripts/run_pipeline.py            # full pipeline (~35 min; add --skip-r
 python -m pytest                          # run the tests
 streamlit run dashboard/app.py            # open http://localhost:8501
 ```
-First-time setup (creating `.venv`, installing packages) is described in [docs/reproducibility.md](docs/reproducibility.md).
+First-time setup (creating `.venv` with **Python 3.12**, installing packages) is described in
+[docs/reproducibility.md](docs/reproducibility.md). Python 3.13 is not supported: on the development machine
+it crashed inside `asyncio` when Streamlit was loaded.
 The raw-data folder defaults to `..\project data\dataset`. Override it with `INVENTORY_DATA_DIR`
 (see `.env.example`).
 
@@ -55,7 +57,7 @@ src/inventory_rl/         package: data, features, forecasting, uncertainty, ris
                           environment, agents, baselines, evaluation, visualization, utils
 scripts/                  one script per stage + run_pipeline.py
 dashboard/                Streamlit app (reads saved artifacts only)
-notebooks/                Colab/local walkthrough using the package
+notebooks/                walkthrough calling the package (Colab setup cells included but untested on Colab)
 tests/                    pytest suite (synthetic fixtures)
 docs/                     data dictionary, audit, methodology, assumptions, experiments, reproducibility
 data/, models/, results/  generated (git-ignored except reports/metrics)

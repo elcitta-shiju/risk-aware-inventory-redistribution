@@ -1,7 +1,12 @@
 # Reproducibility
 
 ## Environment
-- Windows 11, Python 3.13.15, CPU only. Exact library versions are in `requirements.txt`.
+- Windows 11, **Python 3.12.10**, CPU only. Exact library versions are in `requirements.txt`.
+- **Use Python 3.12, not 3.13.** On the development machine, Python 3.13.15 with this package set crashed
+  natively inside `asyncio` (access violation) once Streamlit was imported, so the dashboard could not start.
+  Under 3.12.10 the same pinned packages work. All processed data and the evaluation summary were
+  regenerated under 3.12 and are identical to the earlier 3.13 outputs. The RL agents were trained under 3.13;
+  they load and reproduce the same evaluation under 3.12, and training itself was smoke-tested under 3.12.
 - Seeds: `seed: 42` (forecasting), RL seeds `[0, 1, 2]`, evaluation scenario seeds 10,000–10,019,
   validation scenario seeds 20,000+, simulated store locations seed 7. All are set in code or config.
 - LightGBM uses multithreading. Results are deterministic for a fixed thread count; tiny differences
@@ -11,7 +16,7 @@
 
 ## Setup (PowerShell, from the `prototype` folder)
 ```powershell
-py -3.13 -m venv .venv
+py -3.12 -m venv .venv               # install 3.12 first if needed: winget install Python.Python.3.12
 .\.venv\Scripts\Activate.ps1          # if blocked: Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
 python -m pip install --upgrade pip
 pip install torch==2.14.1 --index-url https://download.pytorch.org/whl/cpu
@@ -23,7 +28,7 @@ copy .env.example .env                # then edit INVENTORY_DATA_DIR if your arc
 ## Full run
 ```powershell
 python scripts/run_pipeline.py                    # ~35 min total (RL training is ~27 min)
-python -m pytest                                  # 70 tests
+python -m pytest                                  # 71 tests
 streamlit run dashboard/app.py
 ```
 
@@ -41,6 +46,9 @@ streamlit run dashboard/app.py
 Each stage reads only earlier stages' artifacts, so a stage can be rerun alone. Generated data and
 models are git-ignored and can be fully regenerated from the original archives.
 
-## Google Colab
-`notebooks/pipeline_walkthrough.ipynb` mounts Drive, sets `INVENTORY_DATA_DIR`, installs the
-requirements and calls the same scripts and modules. No logic is duplicated in the notebook.
+## Notebook (Google Colab support is untested)
+`notebooks/pipeline_walkthrough.ipynb` calls the same scripts and modules as the command line; no logic
+is duplicated in it. It contains setup cells intended for Google Colab (mount Drive, set
+`INVENTORY_DATA_DIR`, install requirements), but **the notebook has not been run on Colab**, so treat
+those cells as an untested convenience. Colab's Python version and preinstalled packages may also differ
+from the pinned versions here.
