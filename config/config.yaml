@@ -1,0 +1,86 @@
+# Central experiment configuration. Values marked ASSUMPTION are NOT observed in the data;
+# they are configurable simulation parameters documented in docs/assumptions_and_limitations.md.
+
+seed: 42
+
+data:
+  primary: mendeley
+  mendeley_dir: mendeley_retail_transactions_stocks
+  sales_file: retail_sales_ml_apl.csv
+  inventory_file: retail_inventory_ml_apl.csv
+  kaggle_sales_dir: kaggle_sales_data
+  kaggle_inventory_dir: kaggle_retail_store_inventory
+  # Weekly periods run Monday-Sunday. Partial first/last weeks are dropped.
+  week_anchor: W-SUN
+  first_full_week_start: "2025-06-02"
+  last_full_week_end: "2026-04-19"
+  # Aggregation level for forecasting & redistribution. Category level was audited and has
+  # ~18 weeks median cover with <1% zero-stock weeks (little to redistribute), so SKU level is used.
+  product_level: Product No
+  top_n_products: 30               # selected by TRAINING-period units sold only
+
+splits:            # inclusive week-start dates, strictly chronological
+  train_end: "2025-12-22"        # last training week start
+  val_end: "2026-02-16"          # last validation week start
+  # test = weeks after val_end
+
+features:
+  lags: [1, 2, 3, 4, 8]
+  rolling_windows: [4, 8]
+
+forecasting:
+  min_history_weeks: 8          # weeks of history before first forecast origin
+  lgbm:
+    n_estimators: 300
+    learning_rate: 0.05
+    num_leaves: 15
+    min_child_samples: 20
+    subsample: 0.8
+    subsample_freq: 1
+    colsample_bytree: 0.8
+    verbose: -1
+
+uncertainty:
+  alpha: 0.2                    # 80% central prediction interval (q10-q90)
+  calibration_weeks: 8          # rolling window of past out-of-sample residuals
+
+risk:
+  service_quantile: upper       # use upper bound of demand for shortage risk
+  source_keep: point            # source keeps at least its point forecast (hard constraint)
+
+network:
+  # ASSUMPTION: no store locations exist in the data -> simulated coordinates.
+  simulated_locations: true
+  region_km: 250
+  circuity_factor: 1.3
+  location_seed: 7
+
+costs:
+  # Unit margin and unit cost are OBSERVED (training-period sales amount and COGS per SKU).
+  # The parameters below are ASSUMPTIONS (illustrative, configurable).
+  transfer_fixed: 8.0             # per shipment (handling + dispatch)
+  transfer_per_unit_km: 0.03      # per unit per km
+  holding_rate_per_year: 0.25     # fraction of unit cost per year
+  shortage_cost_multiplier: 1.0   # lost sale costs 1.0 x observed unit margin
+
+environment:
+  horizon_weeks: 8                # episode length (= length of val and test periods)
+  max_target_offset: 2.0          # RL action a in [-1,1] -> target = round(yhat + 2a) units
+  reward_scale: 10.0
+  lead_time_weeks: 0              # ASSUMPTION: transfers arrive before the week's demand
+  excess_horizon_weeks: 8         # horizon used to define excess stock in the risk module
+  eval_poisson_scenarios: 20      # stochastic demand scenarios per product for evaluation
+
+rl:
+  algorithm: PPO
+  total_timesteps: 200000
+  seeds: [0, 1, 2]
+  n_envs: 8
+  eval_freq_steps: 20000          # validation evaluation for checkpoint selection
+  learning_rate: 0.0003
+  n_steps: 256
+  batch_size: 256
+  gamma: 0.97
+  ent_coef: 0.0
+  hidden: 64                      # width of the shared per-store network
+  log_std_init: -1.0              # initial exploration noise (std ~0.37)

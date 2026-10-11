@@ -1,0 +1,113 @@
+{
+  "config": {
+    "data": {
+      "primary": "mendeley",
+      "mendeley_dir": "mendeley_retail_transactions_stocks",
+      "sales_file": "retail_sales_ml_apl.csv",
+      "inventory_file": "retail_inventory_ml_apl.csv",
+      "kaggle_sales_dir": "kaggle_sales_data",
+      "kaggle_inventory_dir": "kaggle_retail_store_inventory",
+      "week_anchor": "W-SUN",
+      "first_full_week_start": "2025-06-02",
+      "last_full_week_end": "2026-04-19",
+      "product_level": "Product No",
+      "top_n_products": 30
+    },
+    "splits": {
+      "train_end": "2025-12-22",
+      "val_end": "2026-02-16"
+    },
+    "features": {
+      "lags": [
+        1,
+        2,
+        3,
+        4,
+        8
+      ],
+      "rolling_windows": [
+        4,
+        8
+      ]
+    }
+  },
+  "selected_groups": [
+    "PROD-140871",
+    "PROD-100805",
+    "PROD-140870",
+    "PROD-100439",
+    "PROD-100803",
+    "PROD-100804",
+    "PROD-140869",
+    "PROD-161865",
+    "PROD-100802",
+    "PROD-140868",
+    "PROD-161864",
+    "PROD-100437",
+    "PROD-175338",
+    "PROD-152143",
+    "PROD-140867",
+    "PROD-100801",
+    "PROD-100438",
+    "PROD-175334",
+    "PROD-100358",
+    "PROD-166366",
+    "PROD-100451",
+    "PROD-100436",
+    "PROD-100435",
+    "PROD-100449",
+    "PROD-139867",
+    "PROD-100800",
+    "PROD-178777",
+    "PROD-100813",
+    "PROD-100799",
+    "PROD-140879"
+  ],
+  "quality": {
+    "rows": 55200,
+    "series": 1200,
+    "stores": 40,
+    "groups": 30,
+    "weeks": 46,
+    "week_range": [
+      "2025-06-02",
+      "2026-04-13"
+    ],
+    "rows_per_split": {
+      "train": 36000,
+      "val": 9600,
+      "test": 9600
+    },
+    "zero_sales_share": 0.827,
+    "closing_stock_missing_share": 0.2803,
+    "opening_stock_missing_share": 0.294,
+    "rows_with_negative_book_stock_records": 555,
+    "negative_receipts_est_share": 0.0118,
+    "stockout_weeks_share (opening_stock==0)": 0.0753,
+    "units_sold_in_weeks_with_missing_stock_record": 497.0,
+    "units_sold_total": 13815.0,
+    "duplicate_keys": 0
+  },
+  "feature_columns": [
+    "f_lag_1",
+    "f_lag_2",
+    "f_lag_3",
+    "f_lag_4",
+    "f_lag_8",
+    "f_roll_mean_4",
+    "f_roll_std_4",
+    "f_roll_mean_8",
+    "f_roll_std_8",
+    "f_expanding_mean",
+    "f_weeks_since_sale",
+    "f_promo_share_lag_1",
+    "f_opening_stock",
+    "f_cover_weeks",
+    "f_group_total_lag_1",
+    "f_store_total_lag_1",
+    "f_weekofyear",
+    "f_month",
+    "f_store",
+    "f_group"
+  ]
+}

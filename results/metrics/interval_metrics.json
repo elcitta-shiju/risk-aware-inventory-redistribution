@@ -1,0 +1,107 @@
+{
+  "chosen": "poisson",
+  "by_split": {
+    "test": {
+      "poisson": {
+        "coverage": 0.9654166666666667,
+        "nominal": 0.8,
+        "upper_coverage": 0.9673958333333333,
+        "upper_nominal": 0.9,
+        "mean_width": 0.6741666666666667,
+        "interval_score": 1.1210416666666667
+      },
+      "qr": {
+        "coverage": 0.9344791666666666,
+        "nominal": 0.8,
+        "upper_coverage": 0.9380208333333333,
+        "upper_nominal": 0.9,
+        "mean_width": 0.39979166666666666,
+        "interval_score": 1.2445833333333334
+      },
+      "cqr": {
+        "coverage": 0.9344791666666666,
+        "nominal": 0.8,
+        "upper_coverage": 0.9380208333333333,
+        "upper_nominal": 0.9,
+        "mean_width": 0.39979166666666666,
+        "interval_score": 1.2445833333333334
+      },
+      "conformal": {
+        "coverage": 0.7852083333333333,
+        "nominal": 0.8,
+        "upper_coverage": 0.9145833333333333,
+        "upper_nominal": 0.9,
+        "mean_width": 0.015208333333333334,
+        "interval_score": 2.5610416666666667
+      }
+    },
+    "train": {
+      "poisson": {
+        "coverage": 0.9487878787878787,
+        "nominal": 0.8,
+        "upper_coverage": 0.949469696969697,
+        "upper_nominal": 0.9,
+        "mean_width": 0.8295833333333333,
+        "interval_score": 1.7136742424242424
+      },
+      "qr": {
+        "coverage": 0.8579166666666667,
+        "nominal": 0.8,
+        "upper_coverage": 0.8975378787878788,
+        "upper_nominal": 0.9,
+        "mean_width": 0.42454545454545456,
+        "interval_score": 2.3128030303030305
+      },
+      "cqr": {
+        "coverage": 0.8650396825396826,
+        "nominal": 0.8,
+        "upper_coverage": 0.8988492063492064,
+        "upper_nominal": 0.9,
+        "mean_width": 0.4280555555555556,
+        "interval_score": 2.2328174603174604
+      },
+      "conformal": {
+        "coverage": 0.8113095238095238,
+        "nominal": 0.8,
+        "upper_coverage": 0.871031746031746,
+        "upper_nominal": 0.9,
+        "mean_width": 0.2228968253968254,
+        "interval_score": 2.7201190476190478
+      }
+    },
+    "val": {
+      "poisson": {
+        "coverage": 0.9702083333333333,
+        "nominal": 0.8,
+        "upper_coverage": 0.9714583333333333,
+        "upper_nominal": 0.9,
+        "mean_width": 0.6709375,
+        "interval_score": 1.0126041666666667
+      },
+      "qr": {
+        "coverage": 0.89375,
+        "nominal": 0.8,
+        "upper_coverage": 0.9357291666666666,
+        "upper_nominal": 0.9,
+        "mean_width": 0.30322916666666666,
+        "interval_score": 1.4678125
+      },
+      "cqr": {
+        "coverage": 0.89375,
+        "nominal": 0.8,
+        "upper_coverage": 0.9357291666666666,
+        "upper_nominal": 0.9,
+        "mean_width": 0.30322916666666666,
+        "interval_score": 1.4678125
+      },
+      "conformal": {
+        "coverage": 0.8682291666666667,
+        "nominal": 0.8,
+        "upper_coverage": 0.9221875,
+        "upper_nominal": 0.9,
+        "mean_width": 0.24875,
+        "interval_score": 1.7508333333333332
+      }
+    }
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "val": {
+    "brier_p_stockout": 0.023463780733993772,
+    "risk_class_share": {
+      "excess": 0.3562,
+      "unknown stock": 0.3059,
+      "balanced": 0.2916,
+      "high stockout risk": 0.0395,
+      "below upper bound": 0.0068
+    },
+    "mean_rebalanceable_units_per_product_week": 0.4666666666666667,
+    "share_product_weeks_with_rebalanceable_units": 0.11666666666666667
+  },
+  "test": {
+    "brier_p_stockout": 0.035020932092223706,
+    "risk_class_share": {
+      "balanced": 0.3792,
+      "unknown stock": 0.3445,
+      "excess": 0.1398,
+      "high stockout risk": 0.1322,
+      "below upper bound": 0.0044
+    },
+    "mean_rebalanceable_units_per_product_week": 0.3541666666666667,
+    "share_product_weeks_with_rebalanceable_units": 0.10833333333333334
+  }
+}

@@ -1,0 +1,442 @@
+{
+  "files": [
+    {
+      "dataset": "raw",
+      "file": "extraction_manifest.json",
+      "format": "json",
+      "size_mb": 0.001242
+    },
+    {
+      "dataset": "kaggle_retail_store_inventory",
+      "file": "retail_store_inventory.csv",
+      "format": "csv",
+      "size_mb": 6.191463
+    },
+    {
+      "dataset": "kaggle_sales_data",
+      "file": "sales_data.csv",
+      "format": "csv",
+      "size_mb": 6.346402
+    },
+    {
+      "dataset": "mendeley_retail_transactions_stocks",
+      "file": "retail_inventory_ml_apl.csv",
+      "format": "csv",
+      "size_mb": 99.99425
+    },
+    {
+      "dataset": "mendeley_retail_transactions_stocks",
+      "file": "retail_sales_ml_apl.csv",
+      "format": "csv",
+      "size_mb": 39.072489
+    }
+  ],
+  "mendeley": {
+    "dataset": "Mendeley Retail Transactions and Stocks",
+    "sales": {
+      "rows": 125751,
+      "columns": {
+        "transaction_date": "datetime64[us]",
+        "sales_type": "str",
+        "is_return": "int64",
+        "reason_of_return": "float64",
+        "supplier": "str",
+        "product_no": "str",
+        "product_description": "str",
+        "product_division": "str",
+        "product_category": "str",
+        "product_subcategory": "str",
+        "product_segment": "str",
+        "store": "str",
+        "sales_channel": "str",
+        "qty_sold": "float64",
+        "sales_amount": "float64",
+        "cogs": "float64",
+        "number_of_transactions": "int64"
+      },
+      "missing": {
+        "reason_of_return": 125751
+      },
+      "duplicate_rows": 0,
+      "transaction_date_range": [
+        "2025-06-01 00:00:00",
+        "2026-04-24 00:00:00"
+      ],
+      "numeric_summary": {
+        "is_return": {
+          "mean": 0.06,
+          "min": 0.0,
+          "50%": 0.0,
+          "max": 1.0
+        },
+        "reason_of_return": {
+          "mean": NaN,
+          "min": NaN,
+          "50%": NaN,
+          "max": NaN
+        },
+        "qty_sold": {
+          "mean": 0.93,
+          "min": -3.0,
+          "50%": 1.0,
+          "max": 14.0
+        },
+        "sales_amount": {
+          "mean": 83.356,
+          "min": -380.0,
+          "50%": 90.0,
+          "max": 2660.0
+        },
+        "cogs": {
+          "mean": 46.503,
+          "min": -192.28,
+          "50%": 50.05,
+          "max": 1345.96
+        },
+        "number_of_transactions": {
+          "mean": 1.043,
+          "min": 1.0,
+          "50%": 1.0,
+          "max": 14.0
+        }
+      },
+      "negative_counts": {
+        "qty_sold": 7491,
+        "sales_amount": 7491,
+        "cogs": 7491
+      },
+      "n_stores": 40,
+      "n_products": 2326,
+      "return_rows": 7491,
+      "returns_with_nonnegative_qty": 0,
+      "sales_with_negative_qty": 0,
+      "single_valued_columns": [
+        "reason_of_return",
+        "sales_channel"
+      ],
+      "sales_type_counts": {
+        "Full Price": 93929,
+        "Promo": 23651,
+        "Markdown Tier 1": 4384,
+        "Markdown Tier 2": 2434,
+        "Clearance": 1353
+      },
+      "product_division_counts": {
+        "Scholar Footwear": 76907,
+        "Femme Footwear": 29848,
+        "Junior Apparel": 18996
+      },
+      "transactions_per_store_product": {
+        "count": 50447.0,
+        "mean": 2.49,
+        "std": 2.5,
+        "min": 1.0,
+        "25%": 1.0,
+        "50%": 2.0,
+        "75%": 3.0,
+        "max": 56.0
+      },
+      "stores_per_product": {
+        "count": 2326.0,
+        "mean": 21.69,
+        "std": 10.41,
+        "min": 5.0,
+        "25%": 13.0,
+        "50%": 19.0,
+        "75%": 31.0,
+        "max": 40.0
+      },
+      "n_categories": 27
+    },
+    "inventory": {
+      "rows": 284755,
+      "columns": {
+        "start_date": "datetime64[us]",
+        "end_date": "datetime64[us]",
+        "stock_status": "str",
+        "supplier": "str",
+        "product_no": "str",
+        "product_description": "str",
+        "product_division": "str",
+        "product_category": "str",
+        "product_subcategory": "str",
+        "product_segment": "str",
+        "store": "str",
+        "store_type": "str",
+        "sales_channel": "str",
+        "qty_on_hand": "int64",
+        "stocks_selling_amount": "float64",
+        "cost_of_stocks": "float64",
+        "stock_unit_selling_price": "float64",
+        "stock_unit_cost_price": "float64",
+        "is_open": "bool"
+      },
+      "missing": {
+        "end_date": 22701
+      },
+      "duplicate_rows": 0,
+      "duplicate_keys": 0,
+      "start_date_range": [
+        "2025-06-01 00:00:00",
+        "2026-04-24 00:00:00"
+      ],
+      "end_date_range": [
+        "2025-06-01 00:00:00",
+        "2026-04-23 00:00:00"
+      ],
+      "numeric_summary": {
+        "qty_on_hand": {
+          "mean": 2.295,
+          "min": -9.0,
+          "50%": 2.0,
+          "max": 56.0
+        },
+        "stocks_selling_amount": {
+          "mean": 224.393,
+          "min": -828.0,
+          "50%": 160.0,
+          "max": 5600.0
+        },
+        "cost_of_stocks": {
+          "mean": 111.046,
+          "min": -418.95,
+          "50%": 80.96,
+          "max": 2641.45
+        },
+        "stock_unit_selling_price": {
+          "mean": 95.313,
+          "min": 0.0,
+          "50%": 100.0,
+          "max": 250.0
+        },
+        "stock_unit_cost_price": {
+          "mean": 47.419,
+          "min": -16.94,
+          "50%": 50.05,
+          "max": 336.38
+        }
+      },
+      "negative_counts": {
+        "qty_on_hand": 1380,
+        "stocks_selling_amount": 1380,
+        "cost_of_stocks": 8022,
+        "stock_unit_cost_price": 25
+      },
+      "open_records": 22701,
+      "start_after_end": 0,
+      "negative_qty_rows": 1380,
+      "zero_qty_rows": 13869,
+      "interval_gap_days_counts": {
+        "1.0": 203777,
+        "3.0": 1205,
+        "2.0": 1023,
+        "29.0": 481,
+        "4.0": 445,
+        "134.0": 366,
+        "5.0": 345,
+        "6.0": 327
+      },
+      "overlapping_intervals": 0,
+      "contiguous_transitions": 203777,
+      "share_stock_change_equals_minus_sales": 0.7994,
+      "share_increase_without_sale (receipts/transfers in)": 0.1392,
+      "single_valued_columns": [
+        "store_type",
+        "sales_channel"
+      ]
+    },
+    "linkage": {
+      "store_products_in_sales": 50447,
+      "store_products_in_inventory": 60968,
+      "sales_pairs_without_inventory_record": 2588,
+      "stores_match": true
+    }
+  },
+  "kaggle_sales_data": {
+    "rows": 76000,
+    "columns": {
+      "date": "datetime64[us]",
+      "store_id": "str",
+      "product_id": "str",
+      "category": "str",
+      "region": "str",
+      "inventory_level": "int64",
+      "units_sold": "int64",
+      "units_ordered": "int64",
+      "price": "float64",
+      "discount": "int64",
+      "weather_condition": "str",
+      "promotion": "int64",
+      "competitor_pricing": "float64",
+      "seasonality": "str",
+      "epidemic": "int64",
+      "demand": "int64"
+    },
+    "missing": {},
+    "duplicate_rows": 0,
+    "duplicate_keys": 0,
+    "date_range": [
+      "2022-01-01 00:00:00",
+      "2024-01-30 00:00:00"
+    ],
+    "numeric_summary": {
+      "inventory_level": {
+        "mean": 301.063,
+        "min": 0.0,
+        "50%": 227.0,
+        "max": 2267.0
+      },
+      "units_sold": {
+        "mean": 88.827,
+        "min": 0.0,
+        "50%": 84.0,
+        "max": 426.0
+      },
+      "units_ordered": {
+        "mean": 89.091,
+        "min": 0.0,
+        "50%": 0.0,
+        "max": 1616.0
+      },
+      "price": {
+        "mean": 67.726,
+        "min": 4.74,
+        "50%": 64.5,
+        "max": 228.03
+      },
+      "discount": {
+        "mean": 9.087,
+        "min": 0.0,
+        "50%": 10.0,
+        "max": 25.0
+      },
+      "promotion": {
+        "mean": 0.329,
+        "min": 0.0,
+        "50%": 0.0,
+        "max": 1.0
+      },
+      "competitor_pricing": {
+        "mean": 69.454,
+        "min": 4.29,
+        "50%": 65.7,
+        "max": 261.22
+      },
+      "epidemic": {
+        "mean": 0.2,
+        "min": 0.0,
+        "50%": 0.0,
+        "max": 1.0
+      },
+      "demand": {
+        "mean": 104.317,
+        "min": 4.0,
+        "50%": 100.0,
+        "max": 430.0
+      }
+    },
+    "negative_counts": {},
+    "n_stores": 5,
+    "n_products": 20,
+    "n_dates": 760,
+    "max_categories_per_store_product": 1,
+    "max_regions_per_store": 1,
+    "units_sold_lag1_autocorr_mean": 0.1551,
+    "corr_next_inventory_vs_flow_balance": 0.5303,
+    "units_sold_exceeds_inventory_rows": 0,
+    "units_sold_gt_demand_rows": 21000,
+    "corr_units_sold_vs_demand": 0.8334,
+    "dataset": "Kaggle sales_data.csv"
+  },
+  "kaggle_retail_store_inventory": {
+    "rows": 73100,
+    "columns": {
+      "date": "datetime64[us]",
+      "store_id": "str",
+      "product_id": "str",
+      "category": "str",
+      "region": "str",
+      "inventory_level": "int64",
+      "units_sold": "int64",
+      "units_ordered": "int64",
+      "demand_forecast": "float64",
+      "price": "float64",
+      "discount": "int64",
+      "weather_condition": "str",
+      "holiday_promotion": "int64",
+      "competitor_pricing": "float64",
+      "seasonality": "str"
+    },
+    "missing": {},
+    "duplicate_rows": 0,
+    "duplicate_keys": 0,
+    "date_range": [
+      "2022-01-01 00:00:00",
+      "2024-01-01 00:00:00"
+    ],
+    "numeric_summary": {
+      "inventory_level": {
+        "mean": 274.47,
+        "min": 50.0,
+        "50%": 273.0,
+        "max": 500.0
+      },
+      "units_sold": {
+        "mean": 136.465,
+        "min": 0.0,
+        "50%": 107.0,
+        "max": 499.0
+      },
+      "units_ordered": {
+        "mean": 110.004,
+        "min": 20.0,
+        "50%": 110.0,
+        "max": 200.0
+      },
+      "demand_forecast": {
+        "mean": 141.495,
+        "min": -9.99,
+        "50%": 113.015,
+        "max": 518.55
+      },
+      "price": {
+        "mean": 55.135,
+        "min": 10.0,
+        "50%": 55.05,
+        "max": 100.0
+      },
+      "discount": {
+        "mean": 10.01,
+        "min": 0.0,
+        "50%": 10.0,
+        "max": 20.0
+      },
+      "holiday_promotion": {
+        "mean": 0.497,
+        "min": 0.0,
+        "50%": 0.0,
+        "max": 1.0
+      },
+      "competitor_pricing": {
+        "mean": 55.146,
+        "min": 5.03,
+        "50%": 55.01,
+        "max": 104.94
+      }
+    },
+    "negative_counts": {
+      "demand_forecast": 673
+    },
+    "n_stores": 5,
+    "n_products": 20,
+    "n_dates": 731,
+    "max_categories_per_store_product": 5,
+    "max_regions_per_store": 4,
+    "units_sold_lag1_autocorr_mean": -0.0016,
+    "corr_next_inventory_vs_flow_balance": -0.0001,
+    "units_sold_exceeds_inventory_rows": 0,
+    "corr_units_sold_vs_provided_demand_forecast": 0.9969,
+    "negative_demand_forecast_rows": 673,
+    "dataset": "Kaggle retail_store_inventory.csv"
+  }
+}
