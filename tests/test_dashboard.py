@@ -32,7 +32,7 @@ def test_dashboard_app_compiles():
 
 
 def test_dashboard_runs_headless_on_artifacts():
-    """Executes the whole app script (all tabs) against the generated artifacts, if present.
+    """Executes the whole app script (every sidebar page) against the generated artifacts, if present.
 
     Runs in a subprocess so that a native crash of the Streamlit runtime is reported as a test
     failure instead of terminating the whole pytest session."""
@@ -49,17 +49,27 @@ def test_dashboard_runs_headless_on_artifacts():
         "def ok():\n"
         "    assert not at.exception, [e.value for e in at.exception]\n"
         "ok()\n"
-        "assert [t.label for t in at.tabs] == ['Decision Support', 'Store Overview', 'Results', "
-        "'About the Project', 'Technical Details'], [t.label for t in at.tabs]\n"
-        # non-default choices: rule recommender, one product in the overview, actual-sales results,
-        # every planning week, and every cost what-if chart
+        "assert not at.tabs\n"
+        # pages are callables, so AppTest.switch_page (file-based only) cannot reach them; select by hash
+        "pages = {i['url_pathname'] or 'decision_support': h for h, i in at._registered_pages.items()}\n"
+        "assert list(pages) == ['decision_support', 'store_overview', 'results', 'model_performance'], list(pages)\n"
+        "def show(name):\n"
+        "    at._page_hash = pages[name]\n"
+        "    at.run(); ok()\n"
+        # non-default choices: rule recommender, every planning week, one product in the overview,
+        # actual-sales results, and every cost what-if chart
         "at.radio[0].set_value('Rule: cover a high estimate').run(); ok()\n"
-        "at.selectbox(key='ov_prod').select_index(1).run(); ok()\n"
-        "at.radio[1].set_value('Actual past sales').run(); ok()\n"
         "for i in range(len(at.selectbox[0].options)):\n"
         "    at.selectbox[0].select_index(i).run(); ok()\n"
+        "show('store_overview')\n"
+        "at.selectbox(key='ov_prod').select_index(1).run(); ok()\n"
+        "show('results')\n"
+        "at.radio[0].set_value('Actual past sales').run(); ok()\n"
         "for i in range(len(at.selectbox[-1].options)):\n"
         "    at.selectbox[-1].select_index(i).run(); ok()\n"
+        "show('model_performance')\n"
+        "assert {'Forecast accuracy (test weeks)', 'Likely-range accuracy (test weeks)'} <= "
+        "{s.value for s in at.subheader}, [s.value for s in at.subheader]\n"
         "print('APPTEST_OK')\n"
     )
     r = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, timeout=900)

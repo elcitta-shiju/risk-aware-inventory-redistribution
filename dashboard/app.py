@@ -30,8 +30,7 @@ APPROACH_SCALE = alt.Scale(domain=list(APPROACH_COLORS), range=list(APPROACH_COL
 
 st.set_page_config(page_title="Stock Transfer Planner", page_icon="📦", layout="wide")
 st.title("Stock Transfer Planner")
-st.caption("Forecasts next week's demand for each store and product, flags stores at risk, and suggests "
-           "moving stock between stores. Built on past sales and stock data. Transfer results are simulated.")
+st.caption("Forecasts, stockout risk and RL transfer recommendations for 40 stores.")
 
 
 # ------------------------------------------------------------------------------------- loaders
@@ -137,10 +136,8 @@ fc = table(str(PROCESSED_DIR / "forecasts.parquet"))
 summary = table(str(METRICS_DIR / "evaluation_summary.csv"))
 results = js(str(METRICS_DIR / "results.json"))
 
-tabs = st.tabs(["Decision Support", "Store Overview", "Results", "About the Project", "Technical Details"])
-
 # ===================================================================================== 1. decision support
-with tabs[0]:
+def decision_support() -> None:
     st.header("Decision support")
     explain_line("Choose a week, a store and a product to see the demand outlook, the stock risk and the "
                  "recommended transfer.")
@@ -166,7 +163,7 @@ with tabs[0]:
         method = st.radio("Recommendation approach", ["Uncertainty-aware AI agent", "Rule: cover a high estimate"],
                           horizontal=True,
                           help="The AI agent learned when to move stock from past data. The rule tops every store "
-                               "up to a high estimate of next week's demand. The Results tab compares both.")
+                               "up to a high estimate of next week's demand. The Results page compares both.")
         week = pd.Timestamp(weeks[wi])
         si = stores.index(store)
         P = T[prod]
@@ -246,7 +243,7 @@ with tabs[0]:
                      f"data. A store always keeps enough stock for its own expected sales before sending any.")
 
 # ===================================================================================== 2. store overview
-with tabs[1]:
+def store_overview() -> None:
     st.header("Store overview")
     explain_line("Which stores need attention in the chosen week. Red = may run out, amber = too much stock, "
                  "green = normal, grey = no stock count in the data.")
@@ -303,7 +300,7 @@ with tabs[1]:
                          "and chance of running out.")
 
 # ===================================================================================== 3. results
-with tabs[2]:
+def results_page() -> None:
     st.header("Results")
     explain_line("How each approach performed on 8 recent weeks that were held back for testing, compared with "
                  "making no transfers at all.")
@@ -418,52 +415,9 @@ with tabs[2]:
             explain_line("Below the black line an approach loses money. The AI agents were trained once with the "
                          "assumed costs and were not retrained for each what-if value.")
 
-# ===================================================================================== 4. about
-with tabs[3]:
-    st.header("About the project")
-    n_stores = risk.store.nunique() if risk is not None else 40
-    n_prod = risk.group.nunique() if risk is not None else 30
-    st.markdown(f"""
-**The problem.** Some stores run out of a product while other stores have more than they can sell.
-Moving stock between stores can recover lost sales, but every shipment costs money. The question is
-*which* stock to move, *where*, and *when*.
-
-**The data.** Real sales transactions and stock counts from a retail chain (a public research dataset),
-from June 2025 to April 2026. The project uses the {n_prod} best-selling products across {n_stores} stores,
-week by week. Store names and product codes are anonymised in the source data.
-
-**How it works.**
-1. **Forecast:** a machine-learning model predicts next week's sales for every store and product, using
-   only information available before that week.
-2. **Uncertainty:** each forecast comes with a likely range, because weekly sales of one product in one
-   store are small and unpredictable.
-3. **Risk:** the forecast and current stock give each store a chance of running out and a measure of
-   excess stock.
-4. **Recommendation:** an AI agent (trained by reinforcement learning, i.e. trial and error in a
-   simulator) decides how much stock each store should hold, and a matching step turns that into
-   shipments from the nearest stores with spare stock. Simple rules are used for comparison.
-5. **Testing:** every approach is tested on 8 recent weeks that were never used for training.
-
-**Limitations.**
-- Results come from a simulation built on past data, not from a live trial in stores.
-- Store locations are not in the data, so distances use a simulated map.
-- Shipping, holding and lost-sale costs are assumptions; the Results tab shows how conclusions change
-  when they change.
-- Many weeks have no stock count; the simulation treats those as empty.
-- Sales in weeks when a store had sold out understate true demand.
-- Shipments are assumed to arrive before the week's sales (no delivery delay).
-
-**Future work.**
-- Real store locations and road distances, and real shipping costs.
-- Delivery delays, truck capacities and shipping several products together.
-- Training the AI agent under different cost settings, and a rule that weighs shipping cost against
-  the expected benefit.
-- A pilot in a small number of stores.
-""")
-
-# ===================================================================================== 5. technical
-with tabs[4]:
-    st.header("Technical details")
+# ===================================================================================== 4. model performance
+def model_performance() -> None:
+    st.header("Model performance")
     explain_line("Data quality, model accuracy and how the results were produced, for readers who want more detail.")
 
     st.subheader("Pipeline status")
@@ -570,3 +524,9 @@ with tabs[4]:
         explain_line("Test weeks with stock on hand, grouped by predicted chance. Points on the dashed line mean the "
                      "predicted chance matched reality. Few store-weeks have a predicted chance above 50%, so the "
                      "right-hand points rest on very little data (hover to see counts).")
+
+
+st.navigation([st.Page(decision_support, title="Decision Support", default=True),
+               st.Page(store_overview, title="Store Overview"),
+               st.Page(results_page, title="Results", url_path="results"),
+               st.Page(model_performance, title="Model Performance")]).run()
