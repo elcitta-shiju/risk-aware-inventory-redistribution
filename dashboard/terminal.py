@@ -1,13 +1,16 @@
 """Terminal version of the dashboard: the same pages and choices, shown as text menus in the console.
 
 Run from the project root:  python dashboard/terminal.py
-Like the Streamlit app it only READS saved results and trained models (nothing is trained on launch).
+Like the Streamlit app it only READS saved results and trained models (nothing is trained on launch). The
+"Add new data" page cleans a weekly sheet and refreshes next week's forecasts, risk and transfers with the
+already-trained models (inventory_rl.live); the original study's results are never changed.
 """
 
 from __future__ import annotations
 
 import os
 import sys
+import textwrap
 import time
 from pathlib import Path
 
@@ -18,6 +21,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import data_access as da  # noqa: E402
 import explain as ex  # noqa: E402
 
+from inventory_rl.live import update as live  # noqa: E402
+from inventory_rl.live.upload import COLUMNS, clean_weekly_sheet, read_sheet, template  # noqa: E402
 from inventory_rl.utils.config import load_config  # noqa: E402
 from inventory_rl.utils.paths import METRICS_DIR, PROCESSED_DIR, REPORTS_DIR  # noqa: E402
 
@@ -34,6 +39,8 @@ RISK_ANSI = {"Stockout risk": RED, "Excess stock": AMBER, "Normal": GREEN, "No s
 APPROACHES = {"ai": "Uncertainty-aware AI agent", "ai-point": "AI agent", "upper": "Rule: cover a high estimate",
               "cqr": "Rule: cover a calibrated high estimate", "point": "Rule: cover the forecast",
               "none": "No transfers"}
+# the two approaches offered for planning (also used when refreshing the plan from added data)
+APPROACH_NAMES = {APPROACHES[k]: k for k in ("ai", "upper")}
 
 _cache: dict = {}
 
@@ -51,6 +58,14 @@ def table(path: Path):
 
 def js(path: Path):
     return cached(str(path), lambda: da.load_json(path))
+
+
+def live_file(name: str):
+    """A table/summary rebuilt from uploaded data, read fresh each time (None until the first upload)."""
+    if not live.live_ready():
+        return None
+    path = live.LIVE_FILES[name]
+    return da.load_json(path) if path.suffix == ".json" else da.load_table(path)
 
 
 def sim_context():
@@ -185,6 +200,12 @@ def missing(obj, what: str) -> bool:
 # ===================================================================================== 1. decision support
 def decision_support() -> None:
     header("DECISION SUPPORT")
+    if live.live_ready():
+        summ = live_file("summary.json")
+        if choose("Data", [f"Next week, from your added data ({ex.week_label(summ['next_week'])})",
+                           "Test weeks (project evaluation)"], 0) == 0:
+            decision_support_live()
+            return
     note("Choose a week, a store and a product to see the demand outlook, the stock risk and the recommended "
          "transfer. Press Enter at any question to keep the example case (marked *).")
     risk, fc = table(PROCESSED_DIR / "risk.parquet"), table(PROCESSED_DIR / "forecasts.parquet")
@@ -204,8 +225,7 @@ def decision_support() -> None:
     wi = choose("Planning week", [ex.week_label(w) for w in weeks], ex_week, columns=2)
     si = choose("Store", [ex.store_label(s) for s in stores], stores.index(ex_store), columns=5)
     pi = choose("Product", [names[g] for g in products], products.index(ex_prod), columns=3)
-    kind = ["ai", "upper"][choose("Recommendation approach",
-                                  ["Uncertainty-aware AI agent", "Rule: cover a high estimate"], 0)]
+    kind = list(APPROACH_NAMES.values())[choose("Recommendation approach", list(APPROACH_NAMES), 0)]
     store, prod, P, week = stores[si], products[pi], T[products[pi]], pd.Timestamp(weeks[wi])
     stock, valid = trajectory(kind, prod)[wi]
     rk = assess(pd.DataFrame({"opening_stock": stock, "yhat": P.yhat[wi], "hi": P.hi[wi]}),
@@ -238,6 +258,15 @@ def decision_support() -> None:
                                     P.yhat[wi][s], stock[dd], P.yhat[wi][dd], float(rk.p_stockout.iloc[dd]))
         return [ex.store_label(stores[s]), ex.store_label(stores[dd]), q, f"{km:.0f}", ex.money(cost)], reason
 
+    print_transfers(valid, si, store, status, p_out, stock_now, expected, describe)
+    note(f"Stock levels are simulated as if the chosen approach had been in use since the week of "
+         f"{pd.Timestamp(weeks[0]):%d %b %Y}, using the sales that actually happened. Stores without a stock count "
+         f"at that start are treated as empty. Distances come from a simulated store map and costs use the "
+         f"project's assumed shipping costs.")
+
+
+def print_transfers(valid: list, si: int, store: str, status: str, p_out: float, stock_now: float, expected: float,
+                    describe) -> None:
     sub("Recommended transfer")
     mine = [describe(s, dd, q) for s, dd, q in valid if si in (s, dd)]
     if mine:
@@ -250,14 +279,85 @@ def decision_support() -> None:
             print_table([m[0] for m in mine], ["From", "To", "Units", "Distance (km)", "Cost"])
     else:
         print(f"  {BOLD}No transfer for {ex.store_label(store)}.{RESET} "
-              + ex.no_transfer_reason(ex.store_label(store), status, p_out, stock_now, expected))
+              + ex.no_transfer_reason(ex.store_label(store), status, p_out, 0.0 if np.isnan(stock_now) else stock_now,
+                                      expected))
     if valid:
         sub(f"All transfers suggested for this product this week ({len(valid)})")
         print_table([describe(*v)[0] for v in valid], ["From", "To", "Units", "Distance (km)", "Cost"])
-    note(f"Stock levels are simulated as if the chosen approach had been in use since the week of "
-         f"{pd.Timestamp(weeks[0]):%d %b %Y}, using the sales that actually happened. Stores without a stock count "
-         f"at that start are treated as empty. Distances come from a simulated store map and costs use the "
-         f"project's assumed shipping costs.")
+
+
+def decision_support_live() -> None:
+    """Next week's plan built from the uploaded weekly sheets (inventory_rl.live.update)."""
+    lrisk, lfc, ltr, summ = (live_file("risk.parquet"), live_file("forecasts.parquet"), live_file("transfers.csv"),
+                             live_file("summary.json"))
+    fc = table(PROCESSED_DIR / "forecasts.parquet")
+    nxt = lrisk[lrisk.split == "next"]
+    week = pd.Timestamp(summ["next_week"])
+    stores = list(sim_context().network.stores)
+    products = sorted(nxt.group.unique())
+    names = da.product_labels(products)
+    note(f"Plan for the week of {week:%d %b %Y}, using the data you added up to the week of "
+         f"{pd.Timestamp(summ['uploaded_weeks'][-1]):%d %b %Y} (updated {summ['updated_at'].replace('T', ' ')}). "
+         f"Press Enter at any question to keep the suggested case (marked *).")
+    method = list(APPROACH_NAMES)[choose("Recommendation approach", list(APPROACH_NAMES), 0)]
+    tr = ltr[ltr.approach == method]
+    if len(tr):  # default selection: the largest recommended shipment
+        top = tr.sort_values("units", ascending=False).iloc[0]
+        ex_store, ex_prod = top.to_store, top.group
+    else:  # otherwise the store and product expected to be short of the most units
+        top = nxt.sort_values(["expected_shortage", "yhat"], ascending=False).iloc[0]
+        ex_store, ex_prod = top.store, top.group
+    print(f"  {DIM}{len(tr)} shipment(s) recommended across all products next week.{RESET}")
+    si = choose("Store", [ex.store_label(s) for s in stores], stores.index(ex_store), columns=5)
+    pi = choose("Product", [names[g] for g in products], products.index(ex_prod), columns=3)
+    store, prod = stores[si], products[pi]
+    rows = nxt[nxt.group == prod].set_index("store").reindex(stores)
+
+    header(f"{ex.store_label(store)} | {names[prod]} | {ex.week_label(week)} (next week) | {method}")
+    sub("Demand outlook (recent weeks and next week)")
+    cols = ["week_start", "yhat", "y", "lo", "hi"]
+    d = pd.concat([fc.loc[(fc.store == store) & (fc.group == prod), cols],
+                   lfc.loc[(lfc.store == store) & (lfc.group == prod), cols]]).sort_values("week_start").tail(10)
+    top_v = max(d.hi.max(), d.y.max(skipna=True) if d.y.notna().any() else 0, 1)
+    print_table([[f"{pd.Timestamp(r.week_start):%d %b %Y}" + (" <" if pd.Timestamp(r.week_start) == week else ""),
+                  f"{r.yhat:.1f}", f"{r.lo:.0f}-{r.hi:.0f}", "-" if pd.isna(r.y) else f"{r.y:.0f}",
+                  f"{CYAN}{'=' * int(round(20 * r.yhat / top_v))}{RESET}"]
+                 for r in d.itertuples()], ["Week", "Forecast", "Likely range", "Actual sales", "Forecast bar"])
+    note("Forecast made one week ahead, with its likely range. '<' marks next week, which has no sales yet.")
+
+    r = rows.loc[store]
+    status = ex.risk_status(r.risk_class)
+    stock_now, p_out, expected = float(r.opening_stock), float(r.p_stockout), float(r.yhat)
+    sub("Stock risk")
+    print(f"  {RISK_ANSI[status]}{BOLD}{status.upper()}{RESET}  {ex.RISK_HELP[status]}")
+    print(f"  In stock: {BOLD}{'no record' if np.isnan(stock_now) else f'{stock_now:.0f}'}{RESET}"
+          f"{' (estimated)' if r.stock_estimated else ''}   Expected sales: {BOLD}{expected:.1f}{RESET} "
+          f"(likely range {r.lo:.0f} to {r.hi:.0f})   Chance of running out next week: {BOLD}"
+          f"{'unknown' if np.isnan(stock_now) else 'Out of stock' if stock_now <= 0 else ex.chance(p_out)}{RESET}")
+    if r.stock_estimated:
+        note("Estimated stock: your sheets did not give it, so it is the last known stock minus units sold since, "
+             "assuming no deliveries.")
+
+    stock, p_all, yhat = (rows.opening_stock.to_numpy(float), rows.p_stockout.to_numpy(float),
+                          rows.yhat.to_numpy(float))
+    pick = tr[tr.group == prod]
+    valid = [(stores.index(a), stores.index(b), int(q)) for a, b, q in zip(pick.from_store, pick.to_store, pick.units)]
+    costs = {(stores.index(a), stores.index(b)): (km, c) for a, b, km, c in zip(pick.from_store, pick.to_store,
+                                                                                pick.km, pick.cost)}
+
+    def describe(s: int, dd: int, q: int) -> tuple[list, str]:
+        km, cost = costs[(s, dd)]
+        no_rec = bool(np.isnan(stock[dd]))
+        reason = ex.transfer_reason(ex.store_label(stores[s]), ex.store_label(stores[dd]), q, km, cost, stock[s],
+                                    yhat[s], 0.0 if no_rec else stock[dd], yhat[dd],
+                                    1.0 if no_rec else float(p_all[dd]), dst_no_record=no_rec)
+        return [ex.store_label(stores[s]), ex.store_label(stores[dd]), q, f"{km:.0f}", ex.money(cost)], reason
+
+    print_transfers(valid, si, store, status, p_out, stock_now, expected, describe)
+    note("Stock is the stock at the start of next week from your sheets; where a sheet left it out it is estimated, "
+         "and stores with no stock figure at all are treated as empty when planning. Forecasts use the model settings "
+         "chosen in the original study and the AI agent trained in the study. Distances come from a simulated store "
+         "map and costs use the project's assumed shipping costs.")
 
 
 # ===================================================================================== 2. store overview
@@ -268,16 +368,22 @@ def store_overview() -> None:
     risk = table(PROCESSED_DIR / "risk.parquet")
     if missing(risk, "Risk information"):
         return
-    test = risk[risk.split == "test"].assign(status=lambda d: d.risk_class.map(ex.risk_status))
+    test = risk[risk.split == "test"]
+    lrisk = live_file("risk.parquet")
+    if lrisk is not None:  # weeks from uploaded sheets, and the next week to plan for
+        test = pd.concat([test, lrisk[test.columns]], ignore_index=True)
+    test = test.assign(status=lambda d: d.risk_class.map(ex.risk_status))
     weeks, prods = sorted(test.week_start.unique()), sorted(test.group.unique())
     names = da.product_labels(prods)
-    wk = weeks[choose("Week", [ex.week_label(w) for w in weeks], len(weeks) - 1, columns=2)]
+    tag = test.drop_duplicates("week_start").set_index("week_start").split.map(
+        {"new": " (your data)", "next": " (next week)"}).fillna("")
+    wk = weeks[choose("Week", [ex.week_label(w) + tag[w] for w in weeks], len(weeks) - 1, columns=2)]
     pick = (["All products"] + prods)[choose("Product", ["All products"] + [names[g] for g in prods], 0, columns=3)]
     d = test[test.week_start == wk]
     if pick != "All products":
         d = d[d.group == pick]
 
-    header(f"{ex.week_label(wk)} | {pick if pick == 'All products' else names[pick]}")
+    header(f"{ex.week_label(wk)}{tag[wk]} | {pick if pick == 'All products' else names[pick]}")
     n = d.store.nunique()
     print(f"  Stores with a stockout risk : {RED}{d[d.status == 'Stockout risk'].store.nunique()}{RESET} of {n}")
     print(f"  Store-product pairs at risk : {RED}{int((d.status == 'Stockout risk').sum())}{RESET}")
@@ -526,9 +632,143 @@ def week_by_week() -> None:
                   hbar(r["saving_vs_noop"], top)] for n, r in rows], ["Approach", "Saving", "Lost", "Shipments", ""])
 
 
+# ===================================================================================== 6. add new data
+LEVEL_ANSI = {"error": RED, "warning": AMBER, "info": DIM}
+
+
+def yes(prompt: str) -> bool:
+    return input(f"{prompt} [y/N]: ").strip().lower() in ("y", "yes")
+
+
+def refresh_plan() -> dict | None:
+    """Refresh forecasts, risk and next week's transfers from all uploaded data, printing progress."""
+    policies = {name: policy(kind) for name, kind in APPROACH_NAMES.items()}
+    try:
+        s = live.run_update(load_config(), policies, progress=lambda m: print(f"  {DIM}{m}{RESET}"))
+    except Exception as e:
+        print(f"{RED}Updating the plan failed: {e}{RESET}")
+        return None
+    print(f"{GREEN}The plan for the week of {pd.Timestamp(s['next_week']):%d %b %Y} is ready: see Decision Support "
+          f"and Store Overview.{RESET}")
+    return s
+
+
+def save_unique(path: Path, text: str) -> Path:
+    n = 1
+    while path.exists():
+        path = path.with_name(f"{path.stem.rstrip('_0123456789')}_{n}{path.suffix}")
+        n += 1
+    path.write_text(text, encoding="utf-8")
+    return path
+
+
+def upload_sheet(stores: list[str], products: list[str], base_last: pd.Timestamp) -> None:
+    raw_path = input("\nPath of the weekly sheet (CSV or Excel; you can drag the file here): ").strip().strip('"\'')
+    if not raw_path:
+        return
+    path = Path(raw_path).expanduser()
+    if not path.is_file():
+        print(f"{RED}No file found at {path}.{RESET}")
+        return
+    data = path.read_bytes()
+    try:
+        res = clean_weekly_sheet(read_sheet(data, path.name), stores, products, base_last)
+    except Exception as e:  # unreadable file: show why instead of a traceback
+        print(f"{RED}Could not read the file: {e}{RESET}")
+        return
+
+    w = res.weekly
+    header("CHECK BEFORE ADDING")
+    print(f"  Rows in the file: {BOLD}{res.rows_read:,}{RESET}   Rows that can be used: {BOLD}{len(w):,}{RESET}   "
+          f"Weeks: {BOLD}{w.week_start.nunique() if len(w) else 0}{RESET}   "
+          f"Stores: {BOLD}{w.store.nunique() if len(w) else 0}{RESET}")
+    if res.issues:
+        sub("What was found and fixed")
+        for i in res.issues:
+            print(LEVEL_ANSI.get(i.level, "") + textwrap.fill(f"- {i.message}", 78, subsequent_indent="  ") + RESET)
+    if not res.ok:
+        print(f"{RED}Nothing was added.{RESET}")
+        return
+    for text in live.review_upload(w, base_last, len(stores)):
+        print(AMBER + textwrap.fill(f"- {text}", 78, subsequent_indent="  ") + RESET)
+    sub(f"Cleaned data (first 10 of {len(w):,} rows)")
+    names = da.product_labels(products)
+    print_table([[f"{r.week_start:%d %b %Y}", ex.store_label(r.store), names[r.group], f"{r.gross_qty:.0f}",
+                  f"{r.return_qty:.0f}", "-" if pd.isna(r.stock_start) else f"{r.stock_start:.0f}",
+                  "-" if pd.isna(r.stock_end) else f"{r.stock_end:.0f}"] for r in w.head(10).itertuples()],
+                ["Week", "Store", "Product", "Sold", "Returned", "Stock at start", "Stock at end"])
+    if not yes("\nAdd this data and update the plan?"):
+        print("Nothing was added.")
+        return
+    replaced = live.save_upload(w, data, path.name)
+    print(f"{GREEN}Added {len(w):,} rows for {w.week_start.nunique()} week(s)"
+          + (f", replacing {len(replaced)} earlier week(s)" if replaced else "") + f".{RESET}")
+    refresh_plan()
+
+
+def add_data_page() -> None:
+    header("ADD NEW DATA")
+    note("Add each week's sales and stock from a simple sheet, straight from your till or stock system. The sheet is "
+         "checked and cleaned, then the forecasts, stock risk and recommended transfers are updated for the "
+         "following week. The original data and the project's results are never changed.")
+    panel = live.base_panel()
+    stores, products = live.known_codes(panel)
+    base_last = pd.Timestamp(panel.week_start.max())
+    while True:
+        uploads, summ = live.load_uploads(), live_file("summary.json")
+        loaded_to = base_last if uploads is None else max(base_last, pd.Timestamp(uploads.week_start.max()))
+        sub("Status")
+        print(f"  Data runs up to: {BOLD}{ex.week_label(loaded_to)}{RESET}   Weeks you added: "
+              f"{BOLD}{0 if uploads is None else uploads.week_start.nunique()}{RESET}   Planning week: "
+              f"{BOLD}{ex.week_label(summ['next_week']) if summ else 'not yet'}{RESET}")
+        if uploads is not None:
+            added = live.added_weeks(uploads)
+            print_table([[ex.week_label(r.week_start), r.stores, r.rows, f"{r.units:.0f}", r.stock_given, r.file]
+                         for r in added.itertuples()],
+                        ["Week", "Stores", "Rows", "Units sold", "Rows with start stock", "From file"])
+            if not live.live_ready():
+                print(f"{AMBER}The plan has not been updated for the data above (choose 'Update the plan').{RESET}")
+        actions = ["Upload a weekly sheet", "How to prepare the sheet", "Save a blank template and the code list"]
+        if uploads is not None:
+            actions += ["Update the plan again", "Remove all added data"]
+        actions.append("Back to the main menu")
+        act = actions[choose("What would you like to do?", actions, 0)]
+        if act == "Upload a weekly sheet":
+            upload_sheet(stores, products, base_last)
+        elif act == "How to prepare the sheet":
+            sub("One row per store, product and week (CSV or Excel)")
+            print_table([[c.name, "yes" if c.required else "optional", c.meaning] for c in COLUMNS.values()],
+                        ["Column", "Needed", "What to put"])
+            note("Column names do not have to match exactly (e.g. Shop, SKU, Qty Sold, SOH, Closing Stock are "
+                 "recognised); extra columns and title rows are ignored. A product left out of a store's rows counts "
+                 "as 0 sold; a store with no rows in a week counts as not reported. Stock figures make the plan more "
+                 f"reliable. Only the {len(stores)} stores and {len(products)} products the models were built on can "
+                 "be planned. Uploading a week again replaces the earlier upload of that week.")
+        elif act == "Save a blank template and the code list":
+            names = da.product_labels(products)
+            t = save_unique(Path.cwd() / "weekly_sheet_template.csv",
+                            template(stores, products, loaded_to + pd.Timedelta(days=7)).to_csv(index=False))
+            codes = pd.concat([
+                pd.DataFrame({"Type": "Store", "Code": stores, "Name": [ex.store_label(s) for s in stores]}),
+                pd.DataFrame({"Type": "Product", "Code": products, "Name": [names[g] for g in products]})])
+            c = save_unique(Path.cwd() / "store_and_product_codes.csv", codes.to_csv(index=False))
+            print(f"{GREEN}Saved {t} and {c}.{RESET}")
+        elif act == "Update the plan again":
+            refresh_plan()
+        elif act == "Remove all added data":
+            if input("Type 'remove' to delete every sheet you added and the plan built from it: ").strip() == "remove":
+                live.clear_uploads()
+                print(f"{GREEN}All added data was removed.{RESET}")
+            else:
+                print("Nothing was removed.")
+        else:
+            return
+
+
 # ===================================================================================== menu
-PAGES = [("Decision Support", decision_support), ("Store Overview", store_overview), ("Results", results_page),
-         ("Model Performance", model_performance), ("Week-by-week simulation", week_by_week)]
+PAGES = [("Decision Support", decision_support), ("Store Overview", store_overview), ("Add New Data", add_data_page),
+         ("Results", results_page), ("Model Performance", model_performance),
+         ("Week-by-week simulation", week_by_week)]
 
 
 def main() -> None:

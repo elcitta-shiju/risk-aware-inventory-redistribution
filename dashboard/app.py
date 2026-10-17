@@ -1,7 +1,9 @@
 """Streamlit dashboard: risk-aware inventory redistribution, written for store managers.
 
 Run from the project root:  streamlit run dashboard/app.py
-It only READS saved results and trained models (nothing is trained on launch).
+It only READS saved results and trained models (nothing is trained on launch). The "Add new data" page
+cleans an uploaded weekly sheet and refreshes forecasts, risk and transfers for the next week with the
+already-trained models (inventory_rl.live); the original study's results are never changed.
 """
 
 from __future__ import annotations
@@ -18,6 +20,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import data_access as da  # noqa: E402
 import explain as ex  # noqa: E402
 
+from inventory_rl.live import update as live  # noqa: E402
+from inventory_rl.live.upload import COLUMNS, clean_weekly_sheet, read_sheet, template  # noqa: E402
 from inventory_rl.utils.config import load_config  # noqa: E402
 from inventory_rl.utils.paths import METRICS_DIR, PROCESSED_DIR, REPORTS_DIR  # noqa: E402
 
@@ -35,13 +39,23 @@ st.caption("Forecasts, stockout risk and RL transfer recommendations for 40 stor
 
 # ------------------------------------------------------------------------------------- loaders
 @st.cache_data
-def table(path: str):
+def table(path: str, version: float = 0.0):
     return da.load_table(Path(path))
 
 
 @st.cache_data
-def js(path: str):
+def js(path: str, version: float = 0.0):
     return da.load_json(Path(path))
+
+
+def live_file(name: str):
+    """A table/summary rebuilt from uploaded data (None until the first upload). Keyed on the file's
+    modification time, so a new upload is picked up without a restart."""
+    path = live.LIVE_FILES[name]
+    if not live.live_ready():
+        return None
+    version = path.stat().st_mtime
+    return js(str(path), version) if path.suffix == ".json" else table(str(path), version)
 
 
 @st.cache_data
@@ -67,6 +81,9 @@ def recommender(kind: str):
 
             return load_policy(path, True, load_config()["environment"], "Uncertainty-aware AI agent")
     return RuleBasedPolicy("upper")
+
+
+APPROACH_KINDS = {"Uncertainty-aware AI agent": "ai", "Rule: cover a high estimate": "rule"}
 
 
 @st.cache_data
@@ -137,8 +154,85 @@ summary = table(str(METRICS_DIR / "evaluation_summary.csv"))
 results = js(str(METRICS_DIR / "results.json"))
 
 # ===================================================================================== 1. decision support
+def outlook_chart(d: pd.DataFrame, week: pd.Timestamp, note: str) -> None:
+    """Forecast line, likely-range band and actual sales for one store and product."""
+    st.subheader("Demand outlook")
+    long = pd.concat([d[["week_start", "yhat"]].rename(columns={"yhat": "units"}).assign(series="Forecast"),
+                      d[["week_start", "y"]].rename(columns={"y": "units"}).assign(series="Actual sales")]).dropna()
+    band = alt.Chart(d).mark_area(opacity=0.18, color=BLUE).encode(
+        x=alt.X("week_start:T", title=None), y=alt.Y("lo:Q", title="Units per week"), y2="hi:Q")
+    lines = alt.Chart(long).mark_line(point=True).encode(
+        x="week_start:T", y="units:Q",
+        color=alt.Color("series:N", scale=alt.Scale(domain=["Forecast", "Actual sales"], range=[BLUE, DARK]),
+                        legend=alt.Legend(title=None, orient="top")),
+        tooltip=[alt.Tooltip("week_start:T", title="Week"), "series:N",
+                 alt.Tooltip("units:Q", format=".1f", title="Units")])
+    mark = alt.Chart(pd.DataFrame({"w": [week]})).mark_rule(strokeDash=[4, 4], color=GREY).encode(x="w:T")
+    st.altair_chart((band + lines + mark).properties(height=300), width="stretch")
+    explain_line(note)
+
+
+def stock_risk_panel(status: str, stock_now: float, expected: float, lo: float, hi: float, p_out: float,
+                     stock_help: str | None = None) -> None:
+    st.subheader("Stock risk")
+    risk_box(status)
+    m1, m2 = st.columns(2)
+    m1.metric("In stock", "No record" if np.isnan(stock_now) else f"{stock_now:.0f}", border=True, help=stock_help)
+    m2.metric("Expected sales", f"{expected:.1f}", border=True, help=f"Likely range {lo:.0f} to {hi:.0f}")
+    st.metric("Chance of running out next week",
+              "Unknown" if np.isnan(stock_now) else "Out of stock" if stock_now <= 0 else ex.chance(p_out), border=True)
+
+
+def show_transfers(valid: list, si: int, store: str, status: str, p_out: float, stock_now: float, expected: float,
+                   describe) -> None:
+    """The selected store's recommended transfer(s), with the reason, and all transfers for the product."""
+    st.subheader("Recommended transfer")
+    mine = [describe(s, dd, q) for s, dd, q in valid if si in (s, dd)]
+    if mine:
+        t = mine[0]
+        c = st.columns(5)
+        c[0].metric("From", t["From"], border=True)
+        c[1].metric("To", t["To"], border=True)
+        c[2].metric("Quantity", ex.units(t["Units"]), border=True)
+        c[3].metric("Distance", f"{t['Distance (km)']} km", border=True)
+        c[4].metric("Estimated cost", ex.money(t["Cost"]), border=True)
+        with st.container(border=True):
+            st.markdown(f"**Why:** {t['_reason']}")
+        if len(mine) > 1:
+            st.markdown(f"This store is part of {len(mine)} transfers this week:")
+            st.dataframe(pd.DataFrame(mine).drop(columns="_reason"), hide_index=True, width="stretch")
+    else:
+        with st.container(border=True):
+            st.markdown(f"**No transfer for {ex.store_label(store)}.** "
+                        + ex.no_transfer_reason(ex.store_label(store), status, p_out,
+                                                0.0 if np.isnan(stock_now) else stock_now, expected))
+    if valid:
+        with st.expander(f"All transfers suggested for this product this week ({len(valid)})"):
+            st.dataframe(pd.DataFrame([describe(*v) for v in valid]).drop(columns="_reason"),
+                         hide_index=True, width="stretch")
+
+
+def approach_radio() -> str:
+    return st.radio("Recommendation approach", list(APPROACH_KINDS), horizontal=True,
+                    help="The AI agent learned when to move stock from past data. The rule tops every store "
+                         "up to a high estimate of next week's demand. The Results page compares both.")
+
+
 def decision_support() -> None:
     st.header("Decision support")
+    if live.live_ready():
+        summ = live_file("summary.json")
+        mode = st.radio("Data", [f"Next week, from your added data ({ex.week_label(summ['next_week'])})",
+                                 "Test weeks (project evaluation)"], horizontal=True,
+                        help="Your added data: forecasts and transfers for the week after the last week you uploaded. "
+                             "Test weeks: the 8 held-back weeks used to evaluate the project.")
+        if mode.startswith("Next week"):
+            decision_support_live()
+            return
+    decision_support_test()
+
+
+def decision_support_test() -> None:
     explain_line("Choose a week, a store and a product to see the demand outlook, the stock risk and the "
                  "recommended transfer.")
     if need(risk, "Risk information") and need(fc, "Demand forecasts"):
@@ -160,50 +254,24 @@ def decision_support() -> None:
         store = store_opts[c2.selectbox("Store", list(store_opts), index=stores.index(ex_store))]
         prod_opts = {names[g]: g for g in products}
         prod = prod_opts[c3.selectbox("Product", list(prod_opts), index=products.index(ex_prod))]
-        method = st.radio("Recommendation approach", ["Uncertainty-aware AI agent", "Rule: cover a high estimate"],
-                          horizontal=True,
-                          help="The AI agent learned when to move stock from past data. The rule tops every store "
-                               "up to a high estimate of next week's demand. The Results page compares both.")
+        method = approach_radio()
         week = pd.Timestamp(weeks[wi])
         si = stores.index(store)
         P = T[prod]
-        stock, valid = plan("ai" if method.startswith("Uncertainty") else "rule", prod, wi)
+        stock, valid = plan(APPROACH_KINDS[method], prod, wi)
         rk = assess(pd.DataFrame({"opening_stock": stock, "yhat": P.yhat[wi], "hi": P.hi[wi]}),
                     cfg["uncertainty"]["alpha"], cfg["environment"]["excess_horizon_weeks"])
 
         left, right = st.columns([2, 1])
         with left:
-            st.subheader("Demand outlook")
             d = fc[(fc.store == store) & (fc.group == prod) & (fc.week_start <= week)].sort_values("week_start").tail(16)
-            long = pd.concat([d[["week_start", "yhat"]].rename(columns={"yhat": "units"}).assign(series="Forecast"),
-                              d[["week_start", "y"]].rename(columns={"y": "units"}).assign(series="Actual sales")])
-            band = alt.Chart(d).mark_area(opacity=0.18, color=BLUE).encode(
-                x=alt.X("week_start:T", title=None), y=alt.Y("lo:Q", title="Units per week"), y2="hi:Q")
-            lines = alt.Chart(long).mark_line(point=True).encode(
-                x="week_start:T", y="units:Q",
-                color=alt.Color("series:N", scale=alt.Scale(domain=["Forecast", "Actual sales"], range=[BLUE, DARK]),
-                                legend=alt.Legend(title=None, orient="top")),
-                tooltip=[alt.Tooltip("week_start:T", title="Week"), "series:N",
-                         alt.Tooltip("units:Q", format=".1f", title="Units")])
-            mark = alt.Chart(pd.DataFrame({"w": [week]})).mark_rule(strokeDash=[4, 4], color=GREY).encode(x="w:T")
-            st.altair_chart((band + lines + mark).properties(height=300), width="stretch")
-            explain_line("Blue line: forecast made one week ahead. Shaded band: likely range of sales. "
-                         "Dashed line: the planning week (its actual sales are shown for comparison).")
-
+            outlook_chart(d, week, "Blue line: forecast made one week ahead. Shaded band: likely range of sales. "
+                                   "Dashed line: the planning week (its actual sales are shown for comparison).")
         r = rk.iloc[si]
         status = ex.risk_status(r.risk_class)
         p_out, stock_now, expected = float(r.p_stockout), float(r.opening_stock), float(P.yhat[wi][si])
         with right:
-            st.subheader("Stock risk")
-            risk_box(status)
-            m1, m2 = st.columns(2)
-            m1.metric("In stock", f"{stock_now:.0f}", border=True)
-            m2.metric("Expected sales", f"{expected:.1f}", border=True,
-                      help=f"Likely range {P.lo[wi][si]:.0f} to {P.hi[wi][si]:.0f}")
-            st.metric("Chance of running out next week", "Out of stock" if stock_now <= 0 else ex.chance(p_out),
-                      border=True)
-
-        st.subheader("Recommended transfer")
+            stock_risk_panel(status, stock_now, expected, P.lo[wi][si], P.hi[wi][si], p_out)
 
         def describe(s: int, dd: int, q: int) -> dict:
             km = float(ctx.network.distance_km[s, dd])
@@ -213,28 +281,7 @@ def decision_support() -> None:
                         ex.store_label(stores[s]), ex.store_label(stores[dd]), q, km, cost, stock[s],
                         P.yhat[wi][s], stock[dd], P.yhat[wi][dd], float(rk.p_stockout.iloc[dd]))}
 
-        mine = [describe(s, dd, q) for s, dd, q in valid if si in (s, dd)]
-        if mine:
-            t = mine[0]
-            c = st.columns(5)
-            c[0].metric("From", t["From"], border=True)
-            c[1].metric("To", t["To"], border=True)
-            c[2].metric("Quantity", ex.units(t["Units"]), border=True)
-            c[3].metric("Distance", f"{t['Distance (km)']} km", border=True)
-            c[4].metric("Estimated cost", ex.money(t["Cost"]), border=True)
-            with st.container(border=True):
-                st.markdown(f"**Why:** {t['_reason']}")
-            if len(mine) > 1:
-                st.markdown(f"This store is part of {len(mine)} transfers this week:")
-                st.dataframe(pd.DataFrame(mine).drop(columns="_reason"), hide_index=True, width="stretch")
-        else:
-            with st.container(border=True):
-                st.markdown(f"**No transfer for {ex.store_label(store)}.** "
-                            + ex.no_transfer_reason(ex.store_label(store), status, p_out, stock_now, expected))
-        if valid:
-            with st.expander(f"All transfers suggested for this product this week ({len(valid)})"):
-                st.dataframe(pd.DataFrame([describe(*v) for v in valid]).drop(columns="_reason"),
-                             hide_index=True, width="stretch")
+        show_transfers(valid, si, store, status, p_out, stock_now, expected, describe)
         explain_line(f"Stock levels here are simulated as if the chosen approach had been in use since the "
                      f"week of {pd.Timestamp(weeks[0]):%d %b %Y}, using the sales that actually happened, so they can differ "
                      f"from the recorded stock in Store Overview. Stores without a stock count at that start are "
@@ -242,18 +289,94 @@ def decision_support() -> None:
                      f"locations. Costs use the project's assumed shipping costs, in the same currency as the sales "
                      f"data. A store always keeps enough stock for its own expected sales before sending any.")
 
+
+def decision_support_live() -> None:
+    """Next week's plan built from the uploaded weekly sheets (inventory_rl.live.update)."""
+    lrisk, lfc, ltr, summ = (live_file("risk.parquet"), live_file("forecasts.parquet"), live_file("transfers.csv"),
+                             live_file("summary.json"))
+    nxt = lrisk[lrisk.split == "next"]
+    week = pd.Timestamp(summ["next_week"])
+    stores = list(sim_context().network.stores)
+    products = sorted(nxt.group.unique())
+    names = product_names(tuple(products))
+    explain_line(f"Plan for the week of {week:%d %b %Y}, using the data you added up to the week of "
+                 f"{pd.Timestamp(summ['uploaded_weeks'][-1]):%d %b %Y} (updated {summ['updated_at'].replace('T', ' ')}).")
+
+    method = approach_radio()
+    tr = ltr[ltr.approach == method]
+    if len(tr):  # default selection: the largest recommended shipment
+        top = tr.sort_values("units", ascending=False).iloc[0]
+        ex_store, ex_prod = top.to_store, top.group
+    else:  # otherwise the store and product expected to be short of the most units
+        top = nxt.sort_values(["expected_shortage", "yhat"], ascending=False).iloc[0]
+        ex_store, ex_prod = top.store, top.group
+    c1, c2, c3 = st.columns(3)
+    c1.selectbox("Planning week", [f"{ex.week_label(week)} (next week)"], disabled=True)
+    store_opts = {ex.store_label(s): s for s in stores}
+    store = store_opts[c2.selectbox("Store", list(store_opts), index=stores.index(ex_store), key="live_store")]
+    prod_opts = {names[g]: g for g in products}
+    prod = prod_opts[c3.selectbox("Product", list(prod_opts), index=products.index(ex_prod), key="live_prod")]
+    si = stores.index(store)
+    rows = nxt[nxt.group == prod].set_index("store").reindex(stores)
+
+    left, right = st.columns([2, 1])
+    with left:
+        cols = ["week_start", "yhat", "y", "lo", "hi"]
+        hist = pd.concat([fc.loc[(fc.store == store) & (fc.group == prod), cols],
+                          lfc.loc[(lfc.store == store) & (lfc.group == prod), cols]]).sort_values("week_start").tail(16)
+        outlook_chart(hist, week, "Blue line: forecast made one week ahead. Shaded band: likely range of sales. "
+                                  "Dashed line: next week, which has no sales yet.")
+    r = rows.loc[store]
+    status = ex.risk_status(r.risk_class)
+    stock_now, p_out, expected = float(r.opening_stock), float(r.p_stockout), float(r.yhat)
+    with right:
+        stock_risk_panel(status, stock_now, expected, r.lo, r.hi, p_out,
+                         stock_help="Estimated: your sheets did not give this stock, so it is the last known stock "
+                                    "minus units sold since, assuming no deliveries." if r.stock_estimated else None)
+        if r.stock_estimated:
+            st.caption("This stock figure is an estimate: your sheet had no stock figure for it.")
+
+    stock = rows.opening_stock.to_numpy(float)
+    p_all = rows.p_stockout.to_numpy(float)
+    yhat = rows.yhat.to_numpy(float)
+    pick = tr[tr.group == prod]
+    valid = [(stores.index(a), stores.index(b), int(q)) for a, b, q in zip(pick.from_store, pick.to_store, pick.units)]
+    costs = {(stores.index(a), stores.index(b)): (km, c) for a, b, km, c in zip(pick.from_store, pick.to_store,
+                                                                                pick.km, pick.cost)}
+
+    def describe(s: int, dd: int, q: int) -> dict:
+        km, cost = costs[(s, dd)]
+        no_rec = bool(np.isnan(stock[dd]))
+        return {"From": ex.store_label(stores[s]), "To": ex.store_label(stores[dd]), "Units": q,
+                "Distance (km)": round(km), "Cost": round(cost, 2), "_reason": ex.transfer_reason(
+                    ex.store_label(stores[s]), ex.store_label(stores[dd]), q, km, cost, stock[s], yhat[s],
+                    0.0 if no_rec else stock[dd], yhat[dd], 1.0 if no_rec else float(p_all[dd]), dst_no_record=no_rec)}
+
+    show_transfers(valid, si, store, status, p_out, stock_now, expected, describe)
+    explain_line("Stock is the stock at the start of next week from your sheets (the end-of-week stock of the last "
+                 "uploaded week). Where a sheet left it out, it is estimated; stores with no stock figure at all are "
+                 "treated as empty when planning. Forecasts use the model settings chosen in the original study, and "
+                 "the AI agent is the one trained in the study. Distances come from a simulated store map and costs "
+                 "use the project's assumed shipping costs.")
+
 # ===================================================================================== 2. store overview
 def store_overview() -> None:
     st.header("Store overview")
     explain_line("Which stores need attention in the chosen week. Red = may run out, amber = too much stock, "
                  "green = normal, grey = no stock count in the data.")
     if need(risk, "Risk information"):
-        test = risk[risk.split == "test"].assign(status=lambda d: d.risk_class.map(ex.risk_status))
+        test = risk[risk.split == "test"]
+        lrisk = live_file("risk.parquet")
+        if lrisk is not None:  # weeks from uploaded sheets, and the next week to plan for
+            test = pd.concat([test, lrisk[test.columns]], ignore_index=True)
+        test = test.assign(status=lambda d: d.risk_class.map(ex.risk_status))
         weeks = sorted(test.week_start.unique())
         prods = sorted(test.group.unique())
         names = product_names(tuple(prods))
         c1, c2 = st.columns(2)
-        week_opts = {ex.week_label(w): w for w in weeks}
+        tag = test.drop_duplicates("week_start").set_index("week_start").split.map(
+            {"new": " (your data)", "next": " (next week)"}).fillna("")
+        week_opts = {ex.week_label(w) + tag[w]: w for w in weeks}
         wk = week_opts[c1.selectbox("Week", list(week_opts), index=len(weeks) - 1, key="ov_week")]
         prod_opts = {"All products": "All products", **{names[g]: g for g in prods}}
         pick = prod_opts[c2.selectbox("Product", list(prod_opts), key="ov_prod")]
@@ -299,7 +422,140 @@ def store_overview() -> None:
             explain_line("Each tile is a store (number shown). Hover over a tile to see its stock, expected sales "
                          "and chance of running out.")
 
-# ===================================================================================== 3. results
+# ===================================================================================== 3. add new data
+@st.cache_data
+def base_info() -> tuple[list[str], list[str], pd.Timestamp]:
+    panel = live.base_panel()
+    stores, products = live.known_codes(panel)
+    return stores, products, pd.Timestamp(panel.week_start.max())
+
+
+def run_live_update(status) -> dict:
+    """Refresh forecasts, risk and next week's transfers from all uploaded data, reporting progress."""
+    policies = {name: recommender(kind) for name, kind in APPROACH_KINDS.items()}
+    return live.run_update(load_config(), policies, progress=status.write)
+
+
+def add_data_page() -> None:
+    st.header("Add new data")
+    explain_line("Upload each week's sales and stock as a simple sheet, straight from your till or stock system. "
+                 "The sheet is checked and cleaned here, then the forecasts, stock risk and recommended transfers "
+                 "are updated for the following week.")
+    stores, products, base_last = base_info()
+    uploads = live.load_uploads()
+    summ = live_file("summary.json")
+    loaded_to = base_last if uploads is None else max(base_last, pd.Timestamp(uploads.week_start.max()))
+    if msg := st.session_state.pop("upload_message", None):
+        st.success(msg)
+
+    c = st.columns(3)
+    c[0].metric("Data runs up to", ex.week_label(loaded_to), border=True,
+                help=f"The original data ends with the week of {base_last:%d %b %Y}.")
+    c[1].metric("Weeks you added", 0 if uploads is None else uploads.week_start.nunique(), border=True)
+    c[2].metric("Planning week", ex.week_label(summ["next_week"]) if summ else "Not yet", border=True)
+
+    with st.expander("How to prepare the sheet", expanded=uploads is None):
+        st.markdown("One row per **store, product and week**. CSV or Excel. Column names do not have to match "
+                    "exactly; common alternatives are recognised, extra columns are ignored, and title rows above "
+                    "the table are skipped.")
+        st.dataframe(pd.DataFrame([{"Column": c.name, "Needed": "Yes" if c.required else "Optional",
+                                    "What to put": c.meaning,
+                                    "Also recognised": ", ".join(a for a in c.aliases[1:6])}
+                                   for c in COLUMNS.values()]), hide_index=True, width="stretch")
+        st.markdown(
+            "- A product with no sales in a store can be left out, as long as the store has other rows that week: it "
+            "is then counted as 0 sold.\n"
+            "- A store with no rows at all in a week is treated as *not reported* (sales unknown), not as zero sales.\n"
+            "- Stock figures make the plan much more reliable. Without them, stock is estimated from the last known "
+            "stock minus units sold, assuming no deliveries.\n"
+            f"- Only the {len(stores)} stores and {len(products)} products the models were built on can be planned. "
+            "Other rows are reported and skipped.\n"
+            "- Uploading a week again replaces the earlier upload of that week, so a corrected sheet can be re-uploaded.")
+        names = product_names(tuple(products))
+        d1, d2 = st.columns(2)
+        d1.download_button("Download a blank template (CSV)",
+                           template(stores, products, loaded_to + pd.Timedelta(days=7)).to_csv(index=False),
+                           "weekly_sheet_template.csv", "text/csv", width="stretch")
+        codes = pd.concat([pd.DataFrame({"Type": "Store", "Code": stores, "Name": [ex.store_label(s) for s in stores]}),
+                           pd.DataFrame({"Type": "Product", "Code": products, "Name": [names[g] for g in products]})])
+        d2.download_button("Download the store and product codes (CSV)", codes.to_csv(index=False),
+                           "store_and_product_codes.csv", "text/csv", width="stretch")
+
+    key = f"uploader_{st.session_state.get('upload_round', 0)}"
+    file = st.file_uploader("Weekly sheet", type=["csv", "txt", "xlsx", "xlsm"], key=key)
+    if file is not None:
+        data = file.getvalue()
+        try:
+            raw = read_sheet(data, file.name)
+        except Exception as e:  # unreadable file: show why instead of a traceback
+            st.error(f"Could not read the file: {e}")
+            return
+        res = clean_weekly_sheet(raw, stores, products, base_last)
+
+        st.subheader("Check before adding")
+        w = res.weekly
+        c = st.columns(4)
+        c[0].metric("Rows in the file", f"{res.rows_read:,}", border=True)
+        c[1].metric("Rows that can be used", f"{len(w):,}", border=True)
+        c[2].metric("Weeks", w.week_start.nunique() if len(w) else 0, border=True)
+        c[3].metric("Stores", w.store.nunique() if len(w) else 0, border=True)
+        for i in res.issues:
+            {"error": st.error, "warning": st.warning}.get(i.level, st.info)(i.message)
+        if res.ok:
+            new_weeks = sorted(w.week_start.unique())
+            for text in live.review_upload(w, base_last, len(stores)):
+                st.warning(text)
+            preview = w.assign(store=w.store.map(ex.store_label), group=w.group.map(names),
+                               week_start=w.week_start.dt.strftime("%d %b %Y")).rename(columns={
+                "store": "Store", "group": "Product", "week_start": "Week", "gross_qty": "Units sold",
+                "return_qty": "Units returned", "promo_qty": "Units on promotion",
+                "stock_start": "Stock at start", "stock_end": "Stock at end"})
+            with st.expander(f"Cleaned data ({len(w):,} rows)"):
+                st.dataframe(preview, hide_index=True, width="stretch", height=300)
+            if st.button("Add this data and update the plan", type="primary"):
+                replaced = live.save_upload(w, data, file.name)
+                with st.status("Updating forecasts and recommendations...", expanded=True) as status:
+                    try:
+                        s = run_live_update(status)
+                    except Exception as e:
+                        status.update(label="The update failed", state="error")
+                        st.error(f"The data was saved, but updating the plan failed: {e}")
+                        return
+                    status.update(label="Updated", state="complete")
+                st.cache_data.clear()
+                st.session_state["upload_round"] = st.session_state.get("upload_round", 0) + 1
+                st.session_state["upload_message"] = (
+                    f"Added {len(w):,} rows for {len(new_weeks)} week(s)"
+                    + (f" (replacing {len(replaced)} earlier week(s))" if replaced else "")
+                    + f". The plan for the week of {pd.Timestamp(s['next_week']):%d %b %Y} is ready on the Decision Support "
+                      f"and Store Overview pages.")
+                st.rerun()
+        return
+
+    if uploads is not None:
+        st.subheader("Data you have added")
+        added = live.added_weeks(uploads)
+        st.dataframe(added.assign(week_start=added.week_start.map(ex.week_label)).rename(columns={
+            "week_start": "Week", "stores": "Stores", "rows": "Rows", "units": "Units sold",
+            "stock_given": "Rows with start stock", "file": "From file"}), hide_index=True, width="stretch")
+        if not live.live_ready():
+            st.warning("The plan has not been updated for the data above.")
+        if st.button("Update the plan again"):
+            with st.status("Updating forecasts and recommendations...", expanded=True) as status:
+                run_live_update(status)
+                status.update(label="Updated", state="complete")
+            st.cache_data.clear()
+            st.rerun()
+        with st.expander("Remove added data"):
+            st.markdown("Deletes every sheet you added and the plan built from it. The original data and the "
+                        "project's results are not affected.")
+            if st.checkbox("Yes, remove all the data I added") and st.button("Remove"):
+                live.clear_uploads()
+                st.cache_data.clear()
+                st.session_state["upload_message"] = "All added data was removed."
+                st.rerun()
+
+# ===================================================================================== 4. results
 def results_page() -> None:
     st.header("Results")
     explain_line("How each approach performed on 8 recent weeks that were held back for testing, compared with "
@@ -415,7 +671,7 @@ def results_page() -> None:
             explain_line("Below the black line an approach loses money. The AI agents were trained once with the "
                          "assumed costs and were not retrained for each what-if value.")
 
-# ===================================================================================== 4. model performance
+# ===================================================================================== 5. model performance
 def model_performance() -> None:
     st.header("Model performance")
     explain_line("Data quality, model accuracy and how the results were produced, for readers who want more detail.")
@@ -528,5 +784,6 @@ def model_performance() -> None:
 
 st.navigation([st.Page(decision_support, title="Decision Support", default=True),
                st.Page(store_overview, title="Store Overview"),
+               st.Page(add_data_page, title="Add New Data", url_path="add-data"),
                st.Page(results_page, title="Results", url_path="results"),
                st.Page(model_performance, title="Model Performance")]).run()

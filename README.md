@@ -32,12 +32,15 @@ Moving stock between stores can save those lost sales, but every shipment costs 
 - **Comparison with simple rules**: "cover the forecast", "cover a high estimate" and "cover a calibrated high
   estimate", plus "no transfers".
 - **Cost sensitivity**: the test is repeated with each assumed cost changed, to see if conclusions still hold.
-- **Streamlit dashboard** for store managers, with 5 tabs:
+- **Add new weekly data from the dashboard**: upload a simple weekly sheet (CSV or Excel) as exported from a
+  till or stock system; it is checked and cleaned automatically, and next week's forecasts, risk flags and
+  transfers are updated in under a minute, without retraining.
+- **Streamlit dashboard** for store managers, with 5 pages:
   - Decision Support
   - Store Overview
+  - Add New Data
   - Results
-  - About the Project
-  - Technical Details
+  - Model Performance
 
 ## How it works, step by step
 
@@ -139,10 +142,12 @@ src/inventory_rl/         the project code
   baselines/              the simple rules
   evaluation/             test metrics, reports, cost sensitivity
   visualization/          saved figures
+  live/                   cleaning uploaded weekly sheets and refreshing next week's plan
 scripts/                  one script per step, plus run_pipeline.py for everything
 dashboard/                Streamlit app (app.py), plain-language text (explain.py), file loading
 .streamlit/config.toml    dashboard theme (light)
 data/processed/           small processed tables the dashboard reads (raw data is not included)
+data/uploads/, data/live/ weekly sheets added in the dashboard and the plan built from them (not in git)
 models/                   trained AI agents (selected versions) and forecast settings
 results/                  metrics, reports and figures produced by the pipeline
 docs/                     data audit, data dictionary, methodology, experiments, limitations,
@@ -188,6 +193,38 @@ file, which is not included.
 python scripts/run_pipeline.py      # all steps; add --skip-rl to reuse the trained agents
 python -m pytest                    # run the tests
 ```
+
+## Adding new weekly data
+
+Open the **Add New Data** page, download the template if needed, and upload a sheet with one row per store,
+product and week. The terminal version (`python dashboard/terminal.py`, menu option 3) does the same: type or
+drag in the file's path.
+
+| Column | Needed | What to put |
+|---|---|---|
+| Week | yes | any date in the week, or a week such as `2026-W17` |
+| Store | yes | store code, e.g. `STR-1006` or `1006` |
+| Product | yes | product code, e.g. `PROD-100358` or `100358` |
+| Units sold | yes | units sold that week |
+| Units returned | optional | units brought back |
+| Stock at start of week / Stock at end of week | optional, recommended | units in the store |
+| Units sold on promotion | optional | of the units sold, how many at a discount |
+
+The sheet does not need to be tidy. Common alternative column names (`Shop`, `SKU`, `Qty Sold`, `SOH`,
+`Closing Stock`, ...), title rows, extra columns, different date formats, thousands separators, `n/a`, duplicate
+rows, negative sales (counted as returns) and total rows are handled. The page lists every fix and every dropped
+row before anything is saved. After **Add this data and update the plan**:
+
+1. the original file is kept unchanged in `data/uploads/original_files/`, and the cleaned rows are added to the
+   weekly table (re-uploading a week replaces it);
+2. missing stock is filled from the neighbouring weeks, or estimated as last stock minus units sold (flagged);
+3. the forecast model is refitted with the settings chosen in the original study, and the likely ranges, risk
+   flags and the trained AI agent's transfers are produced for the week after the last uploaded week;
+4. Decision Support shows that next week, and Store Overview adds the uploaded weeks.
+
+The original study's data and results are never changed; **Remove added data** on the same page deletes
+everything that was uploaded. Only the 40 stores and 30 products the models were built on can be planned (new
+stores would need the AI agent to be retrained).
 
 ## Limitations and assumptions
 

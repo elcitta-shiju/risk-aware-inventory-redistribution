@@ -52,7 +52,8 @@ def test_dashboard_runs_headless_on_artifacts():
         "assert not at.tabs\n"
         # pages are callables, so AppTest.switch_page (file-based only) cannot reach them; select by hash
         "pages = {i['url_pathname'] or 'decision_support': h for h, i in at._registered_pages.items()}\n"
-        "assert list(pages) == ['decision_support', 'store_overview', 'results', 'model_performance'], list(pages)\n"
+        "assert list(pages) == ['decision_support', 'store_overview', 'add-data', 'results', 'model_performance'], "
+        "list(pages)\n"
         "def show(name):\n"
         "    at._page_hash = pages[name]\n"
         "    at.run(); ok()\n"
@@ -63,6 +64,8 @@ def test_dashboard_runs_headless_on_artifacts():
         "    at.selectbox[0].select_index(i).run(); ok()\n"
         "show('store_overview')\n"
         "at.selectbox(key='ov_prod').select_index(1).run(); ok()\n"
+        "show('add-data')\n"
+        "assert [m.value for m in at.metric][1:] == ['0', 'Not yet'], [m.value for m in at.metric]\n"
         "show('results')\n"
         "at.radio[0].set_value('Actual past sales').run(); ok()\n"
         "for i in range(len(at.selectbox[-1].options)):\n"
@@ -72,7 +75,14 @@ def test_dashboard_runs_headless_on_artifacts():
         "{s.value for s in at.subheader}, [s.value for s in at.subheader]\n"
         "print('APPTEST_OK')\n"
     )
-    r = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, timeout=900)
+    # empty upload folders, so the run never depends on (or changes) a user's added data
+    import os
+    import tempfile
+
+    tmp = tempfile.mkdtemp()
+    env = {**os.environ, "INVENTORY_UPLOADS_DIR": os.path.join(tmp, "uploads"),
+           "INVENTORY_LIVE_DIR": os.path.join(tmp, "live")}
+    r = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, timeout=900, env=env)
     assert r.returncode == 0 and "APPTEST_OK" in r.stdout, (
         f"exit code {r.returncode} (3221225477 / 139 = native access violation)\n{r.stderr[-2000:]}")
 

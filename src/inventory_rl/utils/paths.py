@@ -35,6 +35,10 @@ DATA_DIR = PROJECT_ROOT / "data"
 RAW_DIR = DATA_DIR / "raw"
 INTERIM_DIR = DATA_DIR / "interim"
 PROCESSED_DIR = DATA_DIR / "processed"
+# Weekly sheets added from the dashboard, and the forecasts/risk/transfers rebuilt from them
+# (overridable, e.g. so tests never touch a user's uploads).
+UPLOADS_DIR = Path(os.environ.get("INVENTORY_UPLOADS_DIR", DATA_DIR / "uploads"))
+LIVE_DIR = Path(os.environ.get("INVENTORY_LIVE_DIR", DATA_DIR / "live"))
 MODELS_DIR = PROJECT_ROOT / "models"
 RESULTS_DIR = PROJECT_ROOT / "results"
 FIGURES_DIR = RESULTS_DIR / "figures"

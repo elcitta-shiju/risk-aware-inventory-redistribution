@@ -17,6 +17,8 @@ __pycache__/
 data/raw/*
 data/interim/*
 data/processed/*
+data/uploads/*
+data/live/*
 !data/**/.gitkeep
 !data/processed/panel.parquet
 !data/processed/forecasts.parquet
