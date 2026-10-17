@@ -1,4 +1,4 @@
-"""Data-quality profiling for the raw datasets (Stage 1)."""
+"""Data-quality profiling for the raw Mendeley dataset (Stage 1)."""
 
 from __future__ import annotations
 
@@ -25,34 +25,6 @@ def profile(df: pd.DataFrame, key: list[str] | None = None, date_cols: list[str]
     out["numeric_summary"] = num.describe().T[["mean", "min", "50%", "max"]].round(3).to_dict("index")
     out["negative_counts"] = {c: int((num[c] < 0).sum()) for c in num.columns if (num[c] < 0).any()}
     return out
-
-
-def _lag1_autocorr(df: pd.DataFrame, keys: list[str], col: str) -> float:
-    return float(df.groupby(keys)[col].apply(lambda s: s.autocorr(1)).mean())
-
-
-def audit_kaggle(df: pd.DataFrame, name: str) -> dict[str, Any]:
-    keys = ["store_id", "product_id"]
-    df = df.sort_values(keys + ["date"])
-    res = profile(df, key=["date", *keys], date_cols=["date"])
-    res["n_stores"] = int(df.store_id.nunique())
-    res["n_products"] = int(df.product_id.nunique())
-    res["n_dates"] = int(df.date.nunique())
-    res["max_categories_per_store_product"] = int(df.groupby(keys).category.nunique().max())
-    res["max_regions_per_store"] = int(df.groupby("store_id").region.nunique().max())
-    res["units_sold_lag1_autocorr_mean"] = round(_lag1_autocorr(df, keys, "units_sold"), 4)
-    nxt = df.groupby(keys)["inventory_level"].shift(-1)
-    balance = df.inventory_level - df.units_sold + df.units_ordered
-    res["corr_next_inventory_vs_flow_balance"] = round(float(nxt.corr(balance)), 4)
-    res["units_sold_exceeds_inventory_rows"] = int((df.units_sold > df.inventory_level).sum())
-    if "demand_forecast" in df:
-        res["corr_units_sold_vs_provided_demand_forecast"] = round(float(df.units_sold.corr(df.demand_forecast)), 4)
-        res["negative_demand_forecast_rows"] = int((df.demand_forecast < 0).sum())
-    if "demand" in df:
-        res["units_sold_gt_demand_rows"] = int((df.units_sold > df.demand).sum())
-        res["corr_units_sold_vs_demand"] = round(float(df.units_sold.corr(df.demand)), 4)
-    res["dataset"] = name
-    return res
 
 
 def audit_mendeley(sales: pd.DataFrame, inv: pd.DataFrame) -> dict[str, Any]:
@@ -111,10 +83,6 @@ def run_full_audit() -> dict[str, Any]:
     return {
         "files": loaders.discover_raw_files().to_dict("records"),
         "mendeley": audit_mendeley(sales, inv),
-        "kaggle_sales_data": audit_kaggle(loaders.load_kaggle_sales_data(), "Kaggle sales_data.csv"),
-        "kaggle_retail_store_inventory": audit_kaggle(
-            loaders.load_kaggle_retail_store_inventory(), "Kaggle retail_store_inventory.csv"
-        ),
     }
 
 

@@ -8,8 +8,6 @@ data:
   mendeley_dir: mendeley_retail_transactions_stocks
   sales_file: retail_sales_ml_apl.csv
   inventory_file: retail_inventory_ml_apl.csv
-  kaggle_sales_dir: kaggle_sales_data
-  kaggle_inventory_dir: kaggle_retail_store_inventory
   # Weekly periods run Monday-Sunday. Partial first/last weeks are dropped.
   week_anchor: W-SUN
   first_full_week_start: "2025-06-02"

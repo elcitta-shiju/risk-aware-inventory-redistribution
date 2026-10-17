@@ -1,4 +1,4 @@
-"""Stage 1: profile all extracted datasets and save EDA tables/figures.
+"""Stage 1: profile the extracted Mendeley dataset and save EDA tables/figures.
 
 Outputs: results/reports/data_audit.json, results/figures/eda_*.png
 """
@@ -41,14 +41,6 @@ def eda_figures() -> None:
     ax.set(title="Mendeley: units sold by store", ylabel="Units")
     fig.tight_layout()
     fig.savefig(FIGURES_DIR / "eda_mendeley_store_sales.png", dpi=120)
-    plt.close(fig)
-
-    k = loaders.load_kaggle_sales_data()
-    fig, ax = plt.subplots(figsize=(10, 4))
-    k.groupby("date")[["units_sold", "demand"]].sum().rolling(7).mean().plot(ax=ax)
-    ax.set(title="Kaggle sales_data.csv: daily units sold vs demand (7-day mean)", xlabel="Date")
-    fig.tight_layout()
-    fig.savefig(FIGURES_DIR / "eda_kaggle_sales_data.png", dpi=120)
     plt.close(fig)
 
 

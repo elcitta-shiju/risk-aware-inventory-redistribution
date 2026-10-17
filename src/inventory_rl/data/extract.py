@@ -1,7 +1,7 @@
 """Safe, read-only extraction of the original dataset archives into data/raw/.
 
-The original archives are never modified. Each archive is extracted into its own
-sub-folder; members with absolute paths, '..' traversal or executable extensions are
+The original archives are never modified. Only the archives listed in KNOWN_ARCHIVES (the
+Mendeley dataset) are extracted, each into its own sub-folder; members with absolute paths, '..' traversal or executable extensions are
 skipped, and existing files are never overwritten.
 """
 
@@ -14,10 +14,9 @@ from pathlib import Path, PurePosixPath
 
 from inventory_rl.utils.paths import RAW_DIR, source_data_dir
 
-# Known archives -> (raw sub-folder, source label). Unknown archives get a slugged folder.
+# Archives used by the project -> (raw sub-folder, source label). Other archives in the source
+# folder are ignored by extract_all; extract_archive gives an unlisted archive a slugged folder.
 KNOWN_ARCHIVES: dict[str, tuple[str, str]] = {
-    "archive (1).zip": ("kaggle_sales_data", "Kaggle"),
-    "archive (2).zip": ("kaggle_retail_store_inventory", "Kaggle"),
     "Retail Transactions and Stocks Data.zip": ("mendeley_retail_transactions_stocks", "Mendeley Data"),
 }
 
@@ -79,7 +78,10 @@ def extract_all(source_dir: Path | None = None, raw_dir: Path = RAW_DIR) -> list
     source_dir = source_dir or source_data_dir()
     if not source_dir.exists():
         raise FileNotFoundError(f"Dataset directory not found: {source_dir} (set INVENTORY_DATA_DIR)")
-    records = [extract_archive(a, raw_dir) for a in sorted(source_dir.glob("*.zip"))]
+    archives = [source_dir / name for name in KNOWN_ARCHIVES if (source_dir / name).exists()]
+    if not archives:
+        raise FileNotFoundError(f"None of {list(KNOWN_ARCHIVES)} found in {source_dir}")
+    records = [extract_archive(a, raw_dir) for a in archives]
     raw_dir.mkdir(parents=True, exist_ok=True)
     (raw_dir / "extraction_manifest.json").write_text(
         json.dumps([asdict(r) for r in records], indent=2), encoding="utf-8"

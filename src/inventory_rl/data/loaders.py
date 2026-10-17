@@ -45,18 +45,6 @@ def load_mendeley_inventory(raw_dir: Path = RAW_DIR) -> pd.DataFrame:
     return df
 
 
-def load_kaggle_sales_data(raw_dir: Path = RAW_DIR) -> pd.DataFrame:
-    df = _read(raw_dir / "kaggle_sales_data" / "sales_data.csv")
-    df["date"] = pd.to_datetime(df["date"], format="%Y-%m-%d")
-    return df
-
-
-def load_kaggle_retail_store_inventory(raw_dir: Path = RAW_DIR) -> pd.DataFrame:
-    df = _read(raw_dir / "kaggle_retail_store_inventory" / "retail_store_inventory.csv")
-    df["date"] = pd.to_datetime(df["date"], format="%Y-%m-%d")
-    return df
-
-
 def discover_raw_files(raw_dir: Path = RAW_DIR) -> pd.DataFrame:
     """Inventory of all extracted data files with sizes."""
     rows = [
