@@ -115,6 +115,100 @@ def test_nothing_usable_is_an_error():
     assert not res.ok and any(i.level == "error" for i in res.issues)
 
 
+# ---------------------------------------------------------------- sheets in other layouts
+def test_unrecognised_columns_can_be_matched_by_hand():
+    csv = "When,Where,What,How many,Left over\n2026-04-21,1006,100358,4,7\n"
+    res = clean(csv)
+    assert not res.ok and set(res.missing) == {"week", "store", "product", "units_sold"}
+    assert res.columns_in_file == ["When", "Where", "What", "How many", "Left over"]
+    res = clean(csv, mapping={"week": "When", "store": "Where", "product": "What", "units_sold": "How many",
+                              "stock_end": "Left over"})
+    assert res.ok, messages(res)
+    assert res.weekly.iloc[0][["store", "gross_qty", "stock_end"]].tolist() == ["STR-1006", 4, 7]
+
+
+def test_hand_matching_overrides_and_excludes_columns():
+    csv = "Week,Store,Product,Qty,Units sold,Stock\n2026-04-21,1006,100358,9,4,7\n"
+    res = clean(csv, mapping={"units_sold": "Units sold", "stock_start": None})
+    assert res.ok, messages(res)
+    row = res.weekly.iloc[0]
+    assert row.gross_qty == 4 and np.isnan(row.stock_start)
+
+
+def test_weeks_across_the_columns():
+    res = clean("Store,Product,Stock,2026-04-20,2026-04-27,2026-W19\n"
+                "1006,100358,5,3,,1\n"
+                "1044,100435,2,0,2,4\n")
+    assert res.ok, messages(res)
+    w = res.weekly.set_index(["store", "group", "week_start"]).gross_qty
+    assert w[("STR-1006", "PROD-100358", pd.Timestamp("2026-04-20"))] == 3
+    assert ("STR-1006", "PROD-100358", pd.Timestamp("2026-04-27")) not in w.index   # blank cell: no row
+    assert w[("STR-1044", "PROD-100435", pd.Timestamp("2026-05-04"))] == 4
+    assert len(w) == 5
+    assert "weeks run across" in messages(res) and "Stock could not be used" in messages(res)
+
+
+def test_products_across_the_columns():
+    res = clean("Week,Store,PROD-100358,100435\n2026-04-20,1006,3,1\n2026-04-20,1044,0,2\n")
+    assert res.ok, messages(res)
+    assert sorted(res.weekly.gross_qty) == [0, 1, 2, 3] and set(res.weekly.group) == set(PRODUCTS)
+    assert "products run across" in messages(res)
+
+
+def test_one_store_or_one_week_for_the_whole_file():
+    csv = "Product,Units sold\n100358,3\n100435,1\n"
+    res = clean(csv)
+    assert not res.ok and set(res.missing) == {"week", "store"}
+    res = clean(csv, store="STR-1044", week=pd.Timestamp("2026-04-23"))
+    assert res.ok, messages(res)
+    assert set(res.weekly.store) == {"STR-1044"} and set(res.weekly.week_start) == {pd.Timestamp("2026-04-20")}
+
+
+def test_daily_rows_become_weeks_with_first_and_last_stock():
+    rows = ["Date,Store,Product,Units sold,Opening stock,Closing stock"]
+    for d in range(7):   # Mon 20 Apr .. Sun 26 Apr, stock falls by 1 a day
+        rows.append(f"{pd.Timestamp('2026-04-20') + pd.Timedelta(days=d):%d/%m/%Y},1006,100358,1,{10 - d},{9 - d}")
+    rows.append("27/04/2026,1006,100358,2,3,1")   # one day of the next week
+    res = clean("\n".join(rows) + "\n")
+    assert res.ok, messages(res)
+    w = res.weekly.set_index("week_start")
+    assert w.loc[pd.Timestamp("2026-04-20"), ["gross_qty", "stock_start", "stock_end"]].tolist() == [7, 10, 3]
+    assert w.loc[pd.Timestamp("2026-04-27"), "gross_qty"] == 2
+    text = messages(res)
+    assert "added up into weekly totals" in text and "only 1 day(s)" in text
+    assert "exact duplicate" not in text and "added together" not in text
+
+
+def test_daily_rows_with_one_stock_column_take_the_last_figure_as_end_stock():
+    res = clean("Txn Date,Store,Product,Qty,On Hand\n"
+                "20/04/2026,1006,100358,1,8\n22/04/2026,1006,100358,2,6\n25/04/2026,1006,100358,1,4\n")
+    assert res.ok, messages(res)
+    assert res.weekly.iloc[0][["gross_qty", "stock_start", "stock_end"]].tolist() == [4, 8, 4]
+    assert "'Txn Date' → Week" in messages(res)
+
+
+def test_workbook_reads_every_sales_sheet_and_sheet_names_as_stores():
+    pytest.importorskip("openpyxl")
+    buf = io.BytesIO()
+    with pd.ExcelWriter(buf) as xw:
+        pd.DataFrame({"Notes": ["exported from the till"]}).to_excel(xw, sheet_name="About", index=False)
+        for store, units in (("1006", 3), ("Store 1044", 5)):
+            pd.DataFrame({"Week": ["2026-04-20"], "SKU": [100358], "Qty Sold": [units]}).to_excel(
+                xw, sheet_name=store, index=False)
+    raw = read_sheet(buf.getvalue(), "book.xlsx")
+    assert isinstance(raw, dict) and len(raw) == 3
+    res = clean_weekly_sheet(raw, STORES, PRODUCTS, LAST, today=TODAY)
+    assert res.ok, messages(res)
+    assert res.weekly.set_index("store").gross_qty.to_dict() == {"STR-1006": 3, "STR-1044": 5}
+    assert res.sheets_used == ["1006", "Store 1044"] and "skipped: About" in messages(res)
+
+
+def test_title_line_without_separators_above_the_table():
+    res = clean("Weekly sales export\nWeek,Store,Product,Units sold\n2026-04-20,1006,100358,2\n")
+    assert res.ok, messages(res)
+    assert res.weekly.gross_qty.tolist() == [2]
+
+
 # ---------------------------------------------------------------- weekly table for uploaded weeks
 def tiny_base() -> pd.DataFrame:
     """Two stores x one product, two weeks, with closing stock known in the last week."""

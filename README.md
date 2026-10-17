@@ -32,8 +32,8 @@ Moving stock between stores can save those lost sales, but every shipment costs 
 - **Comparison with simple rules**: "cover the forecast", "cover a high estimate" and "cover a calibrated high
   estimate", plus "no transfers".
 - **Cost sensitivity**: the test is repeated with each assumed cost changed, to see if conclusions still hold.
-- **Add new weekly data from the dashboard**: upload a simple weekly sheet (CSV or Excel) as exported from a
-  till or stock system; it is checked and cleaned automatically, and next week's forecasts, risk flags and
+- **Add new weekly data from the dashboard**: upload a sales and stock sheet (CSV, text or Excel) as exported
+  from a till or stock system, in any common layout; it is checked and cleaned automatically, and next week's forecasts, risk flags and
   transfers are updated in under a minute, without retraining.
 - **Streamlit dashboard** for store managers, with 5 pages:
   - Decision Support
@@ -196,11 +196,13 @@ python -m pytest                    # run the tests
 
 ## Adding new weekly data
 
-Open the **Add New Data** page, download the template if needed, and upload a sheet with one row per store,
-product and week. The terminal version (`python dashboard/terminal.py`, menu option 3) does the same: type or
+Open the **Add New Data** page and upload a sheet (CSV, text, `.xlsx`, `.xlsm` or `.xls`). The template is
+optional. The terminal version (`python dashboard/terminal.py`, menu option 3) does the same: type or
 drag in the file's path.
 
-| Column | Needed | What to put |
+The sheet must contain these items, under any column names:
+
+| Item | Needed | What to put |
 |---|---|---|
 | Week | yes | any date in the week, or a week such as `2026-W17` |
 | Store | yes | store code, e.g. `STR-1006` or `1006` |
@@ -212,8 +214,20 @@ drag in the file's path.
 
 The sheet does not need to be tidy. Common alternative column names (`Shop`, `SKU`, `Qty Sold`, `SOH`,
 `Closing Stock`, ...), title rows, extra columns, different date formats, thousands separators, `n/a`, duplicate
-rows, negative sales (counted as returns) and total rows are handled. The page lists every fix and every dropped
-row before anything is saved. After **Add this data and update the plan**:
+rows, negative sales (counted as returns) and total rows are handled. Other layouts are read too:
+
+- **columns that are not recognised** can be matched by hand after uploading (the *Columns and layout* panel,
+  or the questions in the terminal version);
+- **wide sheets**, with the weeks, products or stores running across the columns (each cell is read as units
+  sold);
+- **daily or till rows**, added up into weeks (start stock = the week's earliest stock figure, end stock = the
+  latest; a week with fewer than 7 days of data at either end of the file is flagged);
+- **files with no store or week column**: choose the store or week for the whole file; Excel sheets named after
+  a store (`1006`, `Store 1006`) are read as that store;
+- **workbooks**: every sheet with a sales table is read, and other sheets are skipped.
+
+Sales must be in units; money columns are never used. The page lists every fix and every dropped row before
+anything is saved. After **Add this data and update the plan**:
 
 1. the original file is kept unchanged in `data/uploads/original_files/`, and the cleaned rows are added to the
    weekly table (re-uploading a week replaces it);

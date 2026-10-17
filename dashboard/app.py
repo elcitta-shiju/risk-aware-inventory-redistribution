@@ -436,6 +436,43 @@ def run_live_update(status) -> dict:
     return live.run_update(load_config(), policies, progress=status.write)
 
 
+NOT_IN_FILE, HAS_STORE, HAS_WEEK = "(not in the file)", "(the file has a store column)", "(the file has a week column)"
+
+
+def column_choices(auto, stores: list[str], base_last: pd.Timestamp, key: str) -> dict:
+    """Let the user say which column is which, and give the whole file one store or week. Returns only what
+    differs from the automatic reading, as keyword arguments for clean_weekly_sheet."""
+    options = [NOT_IN_FILE] + auto.columns_in_file
+    with st.expander("Columns and layout", expanded=bool(auto.missing)):
+        if auto.missing:
+            st.markdown("Some columns were not recognised. Choose which column in your file holds each item "
+                        "(\\* = needed). If the file has no store or week column, choose the store or week it is for.")
+        else:
+            st.caption("How the file was read. Change a choice if a column was matched wrongly.")
+        mapping = {}
+        grid = st.columns(4)
+        for i, (k, c) in enumerate(COLUMNS.items()):
+            found = auto.column_map.get(k)
+            pick = grid[i % 4].selectbox(c.name + (" \\*" if c.required else ""), options,
+                                         index=options.index(found) if found in options else 0,
+                                         help=c.meaning, key=f"{key}_col_{k}")
+            if pick != (found or NOT_IN_FILE):
+                mapping[k] = None if pick == NOT_IN_FILE else pick
+        today = pd.Timestamp.today().normalize()
+        weeks = list(pd.date_range(base_last + pd.Timedelta(days=7), today, freq="W-MON"))
+        a, b = st.columns(2)
+        store = a.selectbox("The whole file is for one store", [HAS_STORE] + stores, key=f"{key}_store",
+                            format_func=lambda s: s if s == HAS_STORE else f"{ex.store_label(s)} ({s})")
+        week = b.selectbox("The whole file is for one week", [HAS_WEEK] + weeks, key=f"{key}_week",
+                           format_func=lambda w: w if w == HAS_WEEK else ex.week_label(w))
+    out = {"mapping": mapping} if mapping else {}
+    if store != HAS_STORE:
+        out["store"] = store
+    if week != HAS_WEEK:
+        out["week"] = week
+    return out
+
+
 def add_data_page() -> None:
     st.header("Add new data")
     explain_line("Upload each week's sales and stock as a simple sheet, straight from your till or stock system. "
@@ -455,10 +492,17 @@ def add_data_page() -> None:
     c[2].metric("Planning week", ex.week_label(summ["next_week"]) if summ else "Not yet", border=True)
 
     with st.expander("How to prepare the sheet", expanded=uploads is None):
-        st.markdown("One row per **store, product and week**. CSV or Excel. Column names do not have to match "
-                    "exactly; common alternatives are recognised, extra columns are ignored, and title rows above "
-                    "the table are skipped.")
-        st.dataframe(pd.DataFrame([{"Column": c.name, "Needed": "Yes" if c.required else "Optional",
+        st.markdown("The template is optional: a sheet exported as it is from a till or stock system usually works. "
+                    "CSV, text or Excel (every sheet of a workbook is read).\n"
+                    "- **Columns**: names do not have to match; common alternatives are recognised, extra columns "
+                    "and title rows are ignored, and anything not recognised can be matched by hand after uploading.\n"
+                    "- **Layout**: one row per store, product and week, or with the weeks, products or stores "
+                    "running across the columns (each cell is then read as units sold).\n"
+                    "- **Daily or till rows** are added up into weeks.\n"
+                    "- **No store or week column** (a file from one store, or for one week): choose the store or week "
+                    "after uploading. Excel sheets named after a store (e.g. *1006*) are read as that store.\n\n"
+                    "What the sheet must contain:")
+        st.dataframe(pd.DataFrame([{"Item": c.name, "Needed": "Yes" if c.required else "Optional",
                                     "What to put": c.meaning,
                                     "Also recognised": ", ".join(a for a in c.aliases[1:6])}
                                    for c in COLUMNS.values()]), hide_index=True, width="stretch")
@@ -470,6 +514,7 @@ def add_data_page() -> None:
             "stock minus units sold, assuming no deliveries.\n"
             f"- Only the {len(stores)} stores and {len(products)} products the models were built on can be planned. "
             "Other rows are reported and skipped.\n"
+            "- Sales must be in units; money columns (value, revenue, price) are never used.\n"
             "- Uploading a week again replaces the earlier upload of that week, so a corrected sheet can be re-uploaded.")
         names = product_names(tuple(products))
         d1, d2 = st.columns(2)
@@ -482,7 +527,7 @@ def add_data_page() -> None:
                            "store_and_product_codes.csv", "text/csv", width="stretch")
 
     key = f"uploader_{st.session_state.get('upload_round', 0)}"
-    file = st.file_uploader("Weekly sheet", type=["csv", "txt", "xlsx", "xlsm"], key=key)
+    file = st.file_uploader("Weekly sheet", type=["csv", "txt", "tsv", "xlsx", "xlsm", "xls"], key=key)
     if file is not None:
         data = file.getvalue()
         try:
@@ -491,6 +536,9 @@ def add_data_page() -> None:
             st.error(f"Could not read the file: {e}")
             return
         res = clean_weekly_sheet(raw, stores, products, base_last)
+        choices = column_choices(res, stores, base_last, f"{key}_{file.name}")
+        if choices:
+            res = clean_weekly_sheet(raw, stores, products, base_last, **choices)
 
         st.subheader("Check before adding")
         w = res.weekly

@@ -662,8 +662,38 @@ def save_unique(path: Path, text: str) -> Path:
     return path
 
 
+def column_choices(res, stores: list[str], base_last: pd.Timestamp) -> dict | None:
+    """Ask which column holds each required item that was not found (or which store / week the whole file is
+    for). Returns keyword arguments for clean_weekly_sheet, or None if the user gives up."""
+    sub("Some columns were not recognised")
+    print(f"  Columns in the file: {', '.join(res.columns_in_file) or 'none'}")
+    if not yes("Choose which column is which?"):
+        return None
+    out: dict = {"mapping": {}}
+    for k in res.missing:
+        options = res.columns_in_file + ["(not in the file)"]
+        if k == "store":
+            options.append("(the whole file is for one store)")
+        if k == "week":
+            options.append("(the whole file is for one week)")
+        pick = options[choose(f"Which column holds '{COLUMNS[k].name}'? ({COLUMNS[k].meaning})", options,
+                              len(res.columns_in_file))]
+        if pick == "(the whole file is for one store)":
+            out["store"] = stores[choose("Which store?", [f"{ex.store_label(s)} ({s})" for s in stores], 0, 4)]
+        elif pick == "(the whole file is for one week)":
+            weeks = list(pd.date_range(base_last + pd.Timedelta(days=7), pd.Timestamp.today().normalize(),
+                                       freq="W-MON"))
+            if not weeks:
+                print(f"{RED}No week after the data already loaded has started yet.{RESET}")
+                return None
+            out["week"] = weeks[choose("Which week?", [ex.week_label(w) for w in weeks], len(weeks) - 1)]
+        elif pick != "(not in the file)":
+            out["mapping"][k] = pick
+    return out
+
+
 def upload_sheet(stores: list[str], products: list[str], base_last: pd.Timestamp) -> None:
-    raw_path = input("\nPath of the weekly sheet (CSV or Excel; you can drag the file here): ").strip().strip('"\'')
+    raw_path = input("\nPath of the sheet (CSV, text or Excel; you can drag the file here): ").strip().strip('"\'')
     if not raw_path:
         return
     path = Path(raw_path).expanduser()
@@ -672,7 +702,15 @@ def upload_sheet(stores: list[str], products: list[str], base_last: pd.Timestamp
         return
     data = path.read_bytes()
     try:
-        res = clean_weekly_sheet(read_sheet(data, path.name), stores, products, base_last)
+        raw = read_sheet(data, path.name)
+        res = clean_weekly_sheet(raw, stores, products, base_last)
+        choices: dict = {"mapping": {}}
+        while res.missing and res.columns_in_file:  # ask until every required item is found, or the user stops
+            new = column_choices(res, stores, base_last)
+            if new is None:
+                break
+            choices = {**choices, **new, "mapping": {**choices["mapping"], **new["mapping"]}}
+            res = clean_weekly_sheet(raw, stores, products, base_last, **choices)
     except Exception as e:  # unreadable file: show why instead of a traceback
         print(f"{RED}Could not read the file: {e}{RESET}")
         return
@@ -736,11 +774,15 @@ def add_data_page() -> None:
         if act == "Upload a weekly sheet":
             upload_sheet(stores, products, base_last)
         elif act == "How to prepare the sheet":
-            sub("One row per store, product and week (CSV or Excel)")
+            sub("What the sheet must contain (CSV, text or Excel; the template is optional)")
             print_table([[c.name, "yes" if c.required else "optional", c.meaning] for c in COLUMNS.values()],
-                        ["Column", "Needed", "What to put"])
-            note("Column names do not have to match exactly (e.g. Shop, SKU, Qty Sold, SOH, Closing Stock are "
-                 "recognised); extra columns and title rows are ignored. A product left out of a store's rows counts "
+                        ["Item", "Needed", "What to put"])
+            note("Column names do not have to match (e.g. Shop, SKU, Qty Sold, SOH, Closing Stock are recognised), "
+                 "and columns that are not recognised can be matched by hand after choosing the file. Extra columns "
+                 "and title rows are ignored and every sheet of a workbook is read. The weeks, products or stores "
+                 "may run across the columns (each cell is then units sold), daily or till rows are added up into "
+                 "weeks, and a file with no store or week column can be given one. Sales must be in units, not "
+                 "money. A product left out of a store's rows counts "
                  "as 0 sold; a store with no rows in a week counts as not reported. Stock figures make the plan more "
                  f"reliable. Only the {len(stores)} stores and {len(products)} products the models were built on can "
                  "be planned. Uploading a week again replaces the earlier upload of that week.")
